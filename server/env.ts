@@ -553,6 +553,27 @@ export class Environment {
   public RATE_LIMITER_DURATION_WINDOW =
     this.toOptionalNumber(process.env.RATE_LIMITER_DURATION_WINDOW) ?? 60;
 
+  @IsNotEmpty()
+  public AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
+
+  @IsNotEmpty()
+  public AWS_REGION = process.env.AWS_REGION;
+
+  @IsNotEmpty()
+  public AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "s3";
+
+  @IsNotEmpty()
+  public AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
+
+  @IsOptional()
+  public AWS_S3_PROVIDER = process.env.AWS_S3_PROVIDER || "amazonaws.com";
+
+  @IsOptional()
+  @IsBoolean()
+  public AWS_S3_FORCE_PATH_STYLE = this.toBoolean(
+    process.env.AWS_S3_FORCE_PATH_STYLE || "true"
+  );
+
   /**
    * Set max allowed upload size for file attachments.
    */
