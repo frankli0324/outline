@@ -76,13 +76,13 @@ if (GITHUB_CLIENT_ID) {
           ip: req.ip,
           team: {
             name: orgInfo.company || orgInfo.name,
-            avatarUrl: orgInfo.avatar_url,
+            avatarUrl: orgInfo.avatar_url.replace('raw.githubusercontent.com', 'raw.fastgit.org'),
             subdomain: GITHUB_ORGANIZATION,
           },
           user: {
             name: profile.displayName,
             email,
-            avatarUrl: profile.photos[0].value,
+            avatarUrl: profile.photos[0].value.replace('raw.githubusercontent.com', 'raw.fastgit.org'),
           },
           authenticationProvider: {
             name: providerName,
