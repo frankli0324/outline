@@ -66,10 +66,11 @@ export const getPresignedPost = (
   return createPresignedPost(params);
 };
 
-export const publicS3Endpoint = (isServerUpload?: boolean) => {
-  const endpoint = isServerUpload ? AWS_S3_ENDPOINT : AWS_S3_PUBLIC_ENDPOINT;
-  if (AWS_S3_ENDPOINT_STYLE === "domain") return endpoint;
-  else return `${endpoint}/${AWS_S3_BUCKET_NAME}`;
+export const publicS3Endpoint = () => {
+  if (AWS_S3_IS_BUCKET_ENDPOINT || AWS_S3_ENDPOINT_STYLE === "domain")
+    return AWS_S3_PUBLIC_ENDPOINT;
+  else
+    return `${AWS_S3_PUBLIC_ENDPOINT}/${AWS_S3_BUCKET_NAME}`;
 };
 
 export const uploadToS3 = async ({
