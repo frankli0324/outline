@@ -16,7 +16,7 @@ const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "outline";
 const AWS_S3_ENDPOINT =
   process.env.AWS_S3_ENDPOINT ||
   `https://${AWS_SERVICE}.${AWS_REGION}.${AWS_S3_PROVIDER}`;
-const AWS_S3_ENDPOINT_STYLE = process.env.AWS_S3_ENDPOINT_STYLE || "path";
+const AWS_S3_ENDPOINT_STYLE = process.env.AWS_S3_ENDPOINT_STYLE || "domain";
 const AWS_S3_PUBLIC_ENDPOINT =
   process.env.AWS_S3_PUBLIC_ENDPOINT || AWS_S3_ENDPOINT;
 
@@ -35,9 +35,8 @@ s3config.endpoint = AWS_S3_PUBLIC_ENDPOINT;
 const s3public = new AWS.S3(s3config); // used only for signing public urls
 
 const createPresignedPost = util
-  .promisify(s3public.createPresignedPost)
+  .promisify(s3.createPresignedPost)
   .bind(s3public);
-const getSignedUrlPromise = s3public.getSignedUrlPromise.bind(s3public);
 
 export const getPresignedPost = async (
   key: string,
@@ -74,9 +73,11 @@ export const getPresignedPost = async (
 
 const _publicS3Endpoint = (() => {
   const url = new URL(AWS_S3_PUBLIC_ENDPOINT);
-  if (AWS_S3_ENDPOINT_STYLE === "domain")
+  if (AWS_S3_ENDPOINT_STYLE === "domain") {
     url.host = `${AWS_S3_BUCKET_NAME}.${url.host}`;
-  else url.pathname += AWS_S3_BUCKET_NAME;
+  } else {
+    url.pathname += AWS_S3_BUCKET_NAME;
+  }
   return url.toString();
 })();
 
