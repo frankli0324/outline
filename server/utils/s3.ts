@@ -13,7 +13,7 @@ const AWS_SERVICE = process.env.AWS_SERVICE || "s3";
 const AWS_S3_PROVIDER = process.env.AWS_S3_PROVIDER || "amazonaws.com";
 const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "outline";
 const AWS_S3_ENDPOINT = process.env.AWS_S3_ENDPOINT || `https://${AWS_SERVICE}.${AWS_REGION}.${AWS_S3_PROVIDER}`;
-const AWS_S3_ENDPOINT_STYLE = process.env.AWS_S3_ENDPOINT_STYLE || "path";
+const AWS_S3_ENDPOINT_STYLE = process.env.AWS_S3_ENDPOINT_STYLE || "domain";
 const AWS_S3_PUBLIC_ENDPOINT = process.env.AWS_S3_PUBLIC_ENDPOINT || AWS_S3_ENDPOINT;
 
 const s3config = {
