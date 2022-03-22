@@ -16,15 +16,12 @@ const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "outline";
 const AWS_S3_ENDPOINT =
   process.env.AWS_S3_ENDPOINT ||
   `https://${AWS_SERVICE}.${AWS_REGION}.${AWS_S3_PROVIDER}`;
-const AWS_S3_ENDPOINT_STYLE = process.env.AWS_S3_ENDPOINT_STYLE || "domain";
-const AWS_S3_IS_BUCKET_ENDPOINT =
-  (process.env.AWS_S3_IS_BUCKET_ENDPOINT || "") !== "" ||
-  AWS_S3_ENDPOINT.includes(AWS_S3_BUCKET_NAME);
+const AWS_S3_ENDPOINT_STYLE = process.env.AWS_S3_ENDPOINT_STYLE || "path";
 const AWS_S3_PUBLIC_ENDPOINT =
   process.env.AWS_S3_PUBLIC_ENDPOINT || AWS_S3_ENDPOINT;
 
 const s3config = {
-  endpoint: "",
+  endpoint: AWS_S3_PUBLIC_ENDPOINT,
   region: AWS_REGION,
   s3ForcePathStyle: AWS_S3_ENDPOINT_STYLE === "path",
   accessKeyId: AWS_ACCESS_KEY_ID,
@@ -75,11 +72,15 @@ export const getPresignedPost = async (
   return signed;
 };
 
-export const publicS3Endpoint = () => {
-  if (AWS_S3_IS_BUCKET_ENDPOINT || AWS_S3_ENDPOINT_STYLE === "domain")
-    return AWS_S3_PUBLIC_ENDPOINT;
-  else return `${AWS_S3_PUBLIC_ENDPOINT}/${AWS_S3_BUCKET_NAME}`;
-};
+const _publicS3Endpoint = (() => {
+  const url = new URL(AWS_S3_PUBLIC_ENDPOINT);
+  if (AWS_S3_ENDPOINT_STYLE === "domain")
+    url.host = `${AWS_S3_BUCKET_NAME}.${url.host}`;
+  else url.pathname += AWS_S3_BUCKET_NAME;
+  return url.toString();
+})();
+
+export const publicS3Endpoint = () => _publicS3Endpoint;
 
 export const uploadToS3 = async ({
   body,
@@ -163,7 +164,7 @@ export const getSignedUrl = async (key: string, expiresIn = 60) => {
     ResponseContentDisposition: "attachment",
   };
 
-  return await getSignedUrlPromise("getObject", params);
+  return await s3public.getSignedUrlPromise("getObject", params);
 };
 
 // function assumes that acl is private
