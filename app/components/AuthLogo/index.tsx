@@ -3,6 +3,7 @@ import styled from "styled-components";
 import GoogleLogo from "./GoogleLogo";
 import MicrosoftLogo from "./MicrosoftLogo";
 import SlackLogo from "./SlackLogo";
+import GithubLogo from "./GithubLogo";
 
 type Props = {
   providerName: string;
@@ -31,7 +32,12 @@ function AuthLogo({ providerName, size = 16 }: Props) {
           <MicrosoftLogo size={size} />
         </Logo>
       );
-
+    case "github":
+      return (
+        <Logo>
+          <GithubLogo size={size} />
+        </Logo>
+      );
     default:
       return null;
   }
