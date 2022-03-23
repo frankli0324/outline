@@ -24,14 +24,7 @@ function isAttachment(token: Token) {
     return false;
   }
 
-  return (
-    // internal
-    href?.startsWith("/api/attachments.redirect") ||
-    // external (public share are pre-signed and this is a reasonable way of detecting them)
-    ((href?.startsWith(env.AWS_S3_UPLOAD_BUCKET_URL) ||
-      href?.startsWith(env.AWS_S3_ACCELERATE_URL)) &&
-      href?.includes("X-Amz-Signature"))
-  );
+  return href?.includes("attachments.redirect");
 }
 
 export default function linksToAttachments(md: MarkdownIt) {

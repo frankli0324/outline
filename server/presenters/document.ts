@@ -7,7 +7,27 @@ type Options = {
   isPublic?: boolean;
 };
 
-async function presentDocument(
+// replaces attachments.redirect urls with signed/authenticated url equivalents
+async function replaceImageAttachments(text: string) {
+  const attachmentIds = parseAttachmentIds(text);
+  await Promise.all(
+    attachmentIds.map(async (id) => {
+      const attachment = await Attachment.findByPk(id);
+
+      if (attachment) {
+        const signedUrl = await getSignedUrl(attachment.key, 3600);
+        text = text.replace(
+          new RegExp(escapeRegExp(attachment.redirectUrl), "g"),
+          signedUrl + "#attachments.redirect"
+        );
+      }
+    })
+  );
+
+  return text;
+}
+
+export default async function present(
   document: Document,
   options: Options | null | undefined = {}
 ) {
