@@ -20,7 +20,7 @@ async function replaceImageAttachments(text: string) {
         const signedUrl = await getSignedUrl(attachment.key, 3600);
         text = text.replace(
           new RegExp(escapeRegExp(attachment.redirectUrl), "g"),
-          signedUrl
+          signedUrl + "#attachments.redirect"
         );
       }
     })

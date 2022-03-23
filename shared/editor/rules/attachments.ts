@@ -21,8 +21,7 @@ function isLinkClose(token: Token) {
 function isAttachment(token: Token) {
   const href = token.attrGet("href");
   return (
-    href?.includes("attachments.redirect") ||
-    href?.startsWith(env.AWS_S3_UPLOAD_BUCKET_URL)
+    href?.includes("attachments.redirect")
   );
 }
 
