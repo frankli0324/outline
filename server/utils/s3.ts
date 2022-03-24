@@ -18,7 +18,7 @@ const AWS_S3_ENDPOINT_STYLE = process.env.AWS_S3_ENDPOINT_STYLE || "domain";
 const AWS_S3_PUBLIC_ENDPOINT = process.env.AWS_S3_PUBLIC_ENDPOINT || AWS_S3_ENDPOINT;
 
 const s3config = {
-  endpoint: AWS_S3_PUBLIC_ENDPOINT,
+  endpoint: "",
   region: AWS_REGION,
   s3ForcePathStyle: AWS_S3_ENDPOINT_STYLE === "path",
   accessKeyId: AWS_ACCESS_KEY_ID,
@@ -26,8 +26,9 @@ const s3config = {
   signatureVersion: "v4",
 }
 
+s3config.endpoint = AWS_S3_ENDPOINT;
 const s3 = new AWS.S3(s3config);
-s3config.endpoint = AWS_S3_PUBLIC_ENDPOINT
+s3config.endpoint = AWS_S3_PUBLIC_ENDPOINT;
 const s3public = new AWS.S3(s3config); // used only for signing public urls
 
 const createPresignedPost: (
@@ -35,6 +36,7 @@ const createPresignedPost: (
 ) => Promise<S3.PresignedPost> = util
   .promisify(s3.createPresignedPost)
   .bind(s3);
+const getSignedUrlPromise = s3public.getSignedUrlPromise;
 
 export const getPresignedPost = (
   key: string,
@@ -153,7 +155,7 @@ export const getSignedUrl = async (key: string, expiresIn = 60) => {
     ResponseContentDisposition: "attachment",
   };
 
-  return await s3public.getSignedUrlPromise("getObject", params);
+  return await getSignedUrlPromise("getObject", params);
 };
 
 // function assumes that acl is private
