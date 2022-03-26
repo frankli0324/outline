@@ -1,5 +1,5 @@
 import util from "util";
-import AWS, { S3 } from "aws-sdk";
+import AWS from "aws-sdk";
 import fetch from "fetch-with-proxy";
 import { compact } from "lodash";
 import { useAgent } from "request-filtering-agent";
@@ -39,7 +39,7 @@ const getPresignedPostPromise = util
   .bind(s3public);
 const getSignedUrlPromise = s3public.getSignedUrlPromise;
 
-export const getPresignedPost = (
+export const getPresignedPost = async (
   key: string,
   acl: string,
   maxUploadSize: number,
@@ -60,7 +60,7 @@ export const getPresignedPost = (
     Expires: 3600,
   };
 
-  return getPresignedPostPromise(params);
+  return await getPresignedPostPromise(params);
 };
 
 const _publicS3Endpoint = (() => {
@@ -82,7 +82,7 @@ export const uploadToS3 = async ({
   key,
   acl,
 }: {
-  body: S3.Body;
+  body: AWS.S3.Body;
   contentLength: number;
   contentType: string;
   key: string;
