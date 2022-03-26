@@ -1,7 +1,5 @@
-import crypto from "crypto";
 import util from "util";
 import AWS from "aws-sdk";
-import { addHours, format } from "date-fns";
 import fetch from "fetch-with-proxy";
 import { v4 as uuidv4 } from "uuid";
 import Logger from "@server/logging/logger";
@@ -12,9 +10,12 @@ const AWS_REGION = process.env.AWS_REGION || "";
 const AWS_SERVICE = process.env.AWS_SERVICE || "s3";
 const AWS_S3_PROVIDER = process.env.AWS_S3_PROVIDER || "amazonaws.com";
 const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "outline";
-const AWS_S3_ENDPOINT = process.env.AWS_S3_ENDPOINT || `https://${AWS_SERVICE}.${AWS_REGION}.${AWS_S3_PROVIDER}`;
+const AWS_S3_ENDPOINT =
+  process.env.AWS_S3_ENDPOINT ||
+  `https://${AWS_SERVICE}.${AWS_REGION}.${AWS_S3_PROVIDER}`;
 const AWS_S3_ENDPOINT_STYLE = process.env.AWS_S3_ENDPOINT_STYLE || "domain";
-const AWS_S3_PUBLIC_ENDPOINT = process.env.AWS_S3_PUBLIC_ENDPOINT || AWS_S3_ENDPOINT;
+const AWS_S3_PUBLIC_ENDPOINT =
+  process.env.AWS_S3_PUBLIC_ENDPOINT || AWS_S3_ENDPOINT;
 
 const s3config = {
   endpoint: "",
@@ -23,85 +24,19 @@ const s3config = {
   accessKeyId: AWS_ACCESS_KEY_ID,
   secretAccessKey: AWS_SECRET_ACCESS_KEY,
   signatureVersion: "v4",
-}
+};
 
 s3config.endpoint = AWS_S3_ENDPOINT;
 const s3 = new AWS.S3(s3config);
 s3config.endpoint = AWS_S3_PUBLIC_ENDPOINT;
 const s3public = new AWS.S3(s3config); // used only for signing public urls
 
-const createPresignedPost = util.promisify(s3public.createPresignedPost).bind(s3public);
+const getPresignedPostPromise = util
+  .promisify(s3public.createPresignedPost)
+  .bind(s3public);
 const getSignedUrlPromise = s3public.getSignedUrlPromise;
 
-const hmac = (
-  key: string | Buffer,
-  message: string,
-  encoding?: "base64" | "hex"
-) => {
-  const o = crypto.createHmac("sha256", key).update(message, "utf8");
-  return encoding ? o.digest(encoding) : o.digest();
-};
-
-export const makeCredential = () => {
-  const credential =
-    AWS_ACCESS_KEY_ID +
-    "/" +
-    format(new Date(), "yyyyMMdd") +
-    "/" +
-    AWS_REGION +
-    "/s3/aws4_request";
-  return credential;
-};
-
-export const makePolicy = (
-  credential: string,
-  longDate: string,
-  acl: string,
-  contentType = "image"
-) => {
-  const tomorrow = addHours(new Date(), 24);
-  const policy = {
-    conditions: [
-      {
-        bucket: process.env.AWS_S3_BUCKET_NAME,
-      },
-      ["starts-with", "$key", ""],
-      {
-        acl,
-      },
-      // @ts-expect-error ts-migrate(2532) FIXME: Object is possibly 'undefined'.
-      ["content-length-range", 0, +process.env.AWS_S3_UPLOAD_MAX_SIZE],
-      ["starts-with", "$Content-Type", contentType],
-      ["starts-with", "$Cache-Control", ""],
-      {
-        "x-amz-algorithm": "AWS4-HMAC-SHA256",
-      },
-      {
-        "x-amz-credential": credential,
-      },
-      {
-        "x-amz-date": longDate,
-      },
-    ],
-    expiration: format(tomorrow, "yyyy-MM-dd'T'HH:mm:ss'Z'"),
-  };
-
-  return Buffer.from(JSON.stringify(policy)).toString("base64");
-};
-
-export const getSignature = (policy: string) => {
-  const kDate = hmac(
-    "AWS4" + AWS_SECRET_ACCESS_KEY,
-    format(new Date(), "yyyyMMdd")
-  );
-  const kRegion = hmac(kDate, AWS_REGION);
-  const kService = hmac(kRegion, "s3");
-  const kCredentials = hmac(kService, "aws4_request");
-  const signature = hmac(kCredentials, policy, "hex");
-  return signature;
-};
-
-export const getPresignedPost = (
+export const getPresignedPost = async (
   key: string,
   acl: string,
   contentType = "image"
@@ -122,15 +57,16 @@ export const getPresignedPost = (
     Expires: 3600,
   };
 
-  return createPresignedPost(params);
+  return await getPresignedPostPromise(params);
 };
 
 const _publicS3Endpoint = (() => {
   const url = new URL(AWS_S3_PUBLIC_ENDPOINT);
-  if (AWS_S3_ENDPOINT_STYLE === "domain")
+  if (AWS_S3_ENDPOINT_STYLE === "domain") {
     url.host = `${AWS_S3_BUCKET_NAME}.${url.host}`;
-  else
+  } else {
     url.pathname += AWS_S3_BUCKET_NAME;
+  }
   return url.toString();
 })();
 
