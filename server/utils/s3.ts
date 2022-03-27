@@ -62,7 +62,16 @@ export const getPresignedPost = (
     Expires: 3600,
   };
 
-  return createPresignedPost(params);
+  let signed = await createPresignedPost(params);
+  let coscompat = {};
+  for (let key in signed.fields) {
+    if (key.toLowerCase().startsWith("x-amz-")) {
+      coscompat["x-cos-" + key.substring(6)] = signed.fields[key];
+    }
+    coscompat[key] = signed.fields[key];
+  }
+  signed.fields = coscompat;
+  return signed;
 };
 
 const _publicS3Endpoint = (() => {
