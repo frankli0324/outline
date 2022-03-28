@@ -34,14 +34,13 @@ const s3 = new AWS.S3(s3config);
 s3config.endpoint = AWS_S3_PUBLIC_ENDPOINT;
 const s3public = new AWS.S3(s3config); // used only for signing public urls
 
-const createPresignedPost: (
-  params: S3.PresignedPost.Params
-) => Promise<S3.PresignedPost> = util
-  .promisify(s3.createPresignedPost)
-  .bind(s3);
-const getSignedUrlPromise = s3public.getSignedUrlPromise;
+const createPresignedPost = util
+  .promisify(s3public.createPresignedPost)
+  .bind(s3public);
+const getSignedUrlPromise = s3public.getSignedUrlPromise
+  .bind(s3public);
 
-export const getPresignedPost = (
+export const getPresignedPost = async (
   key: string,
   acl: string,
   maxUploadSize: number,
