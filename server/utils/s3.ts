@@ -55,8 +55,6 @@ const s3public = new AWS.S3(s3config); // used only for signing public urls
 const getPresignedPostPromise = util
   .promisify(s3public.createPresignedPost)
   .bind(s3public);
-const getSignedUrlPromise = s3public.getSignedUrlPromise
-  .bind(s3public);
 
 export const getPresignedPost = async (
   key: string,
@@ -176,7 +174,7 @@ export const getSignedUrl = async (key: string, expiresIn = 60) => {
     ResponseContentDisposition: "attachment",
   };
 
-  return await getSignedUrlPromise("getObject", params);
+  return await s3public.getSignedUrlPromise("getObject", params);
 };
 
 // function assumes that acl is private
