@@ -34,7 +34,8 @@ const s3public = new AWS.S3(s3config); // used only for signing public urls
 const getPresignedPostPromise = util
   .promisify(s3public.createPresignedPost)
   .bind(s3public);
-const getSignedUrlPromise = s3public.getSignedUrlPromise;
+const getSignedUrlPromise = s3public.getSignedUrlPromise
+  .bind(s3public);
 
 export const getPresignedPost = async (
   key: string,
