@@ -9,6 +9,7 @@ import passportMiddleware from "@server/middlewares/passport";
 import { StateStore } from "@server/utils/passport";
 import fetch from "fetch-with-proxy";
 import util from 'util';
+import crypto from 'crypto';
 
 const router = new Router();
 const providerName = "qqconnect";
@@ -68,6 +69,7 @@ if (QQ_CLIENT_ID) {
           body: `access_token=${accessToken}&openid=${openid}&oauth_consumer_key=${QQ_CLIENT_ID}`,
         })).json();
         console.log(userInfo);
+        let hash = crypto.createHash('md5').update(userInfo.nickname).digest("hex");
 
         const result = await accountProvisioner({
           ip: req.ip,
@@ -77,7 +79,7 @@ if (QQ_CLIENT_ID) {
           },
           user: {
             name: userInfo.nickname,
-            email: `${userInfo.nickname}@mafia.mbti`,
+            email: `${hash}@mafia.mbti`,
             avatarUrl: userInfo.figureurl_qq_1,
           },
           authenticationProvider: {
