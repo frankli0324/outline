@@ -1,4 +1,5 @@
 import { darken, lighten } from "polished";
+import breakpoints from "./breakpoints";
 
 const colors = {
   transparent: "transparent",
@@ -58,7 +59,6 @@ export const base = {
     "'SFMono-Regular',Consolas,'Liberation Mono', Menlo, Courier,monospace",
   fontWeight: 400,
   backgroundTransition: "background 100ms ease-in-out",
-  zIndex: 800,
   selected: colors.primary,
   buttonBackground: colors.primary,
   buttonText: colors.white,
@@ -97,30 +97,7 @@ export const base = {
   noticeTipText: colors.almostBlack,
   noticeWarningBackground: "#ffadbf",
   noticeWarningText: colors.almostBlack,
-  breakpoints: {
-    mobile: 0,
-    // targeting all devices
-    tablet: 737,
-    // targeting devices that are larger than the iPhone 6 Plus (which is 736px in landscape mode)
-    desktop: 1025,
-    // targeting devices that are larger than the iPad (which is 1024px in landscape mode)
-    desktopLarge: 1600,
-  },
-  depths: {
-    header: 800,
-    sidebar: 900,
-    // Note: editor toolbars are 900
-    hoverPreview: 998,
-    // Note: editor lightbox is z-index 999
-    modalOverlay: 2000,
-    modal: 3000,
-    menu: 4000,
-    toasts: 5000,
-    popover: 9000,
-    titleBarDivider: 10000,
-    loadingIndicatorBar: 20000,
-    commandBar: 30000,
-  },
+  breakpoints,
 };
 
 export const light = {
@@ -140,6 +117,12 @@ export const light = {
   sidebarText: "rgb(78, 92, 110)",
   backdrop: "rgba(0, 0, 0, 0.2)",
   shadow: "rgba(0, 0, 0, 0.2)",
+
+  modalBackdrop: colors.black10,
+  modalBackground: colors.white,
+  modalShadow:
+    "0 4px 8px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 0%), 0 30px 40px rgb(0 0 0 / 8%)",
+
   menuItemSelected: colors.warmGrey,
   menuBackground: colors.white,
   menuShadow:
@@ -191,6 +174,12 @@ export const dark = {
   sidebarText: colors.slate,
   backdrop: "rgba(255, 255, 255, 0.3)",
   shadow: "rgba(0, 0, 0, 0.6)",
+
+  modalBackdrop: colors.black50,
+  modalBackground: "#1f2128",
+  modalShadow:
+    "0 0 0 1px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.08)",
+
   menuItemSelected: lighten(0.1, "#1f2128"),
   menuBackground: "#1f2128",
   menuShadow:
