@@ -81,17 +81,6 @@ export const base = {
   codePlaceholder: "#3d8fd1",
   codeInserted: "#202746",
   codeImportant: "#c94922",
-  blockToolbarBackground: colors.white,
-  blockToolbarTrigger: colors.slate,
-  blockToolbarTriggerIcon: colors.white,
-  blockToolbarItem: colors.almostBlack,
-  blockToolbarText: colors.almostBlack,
-  blockToolbarTextSelected: colors.black,
-  blockToolbarSelectedBackground: colors.slateLight,
-  blockToolbarHoverBackground: colors.slateLight,
-  blockToolbarDivider: colors.slateLight,
-  blockToolbarIcon: undefined,
-  blockToolbarIconSelected: colors.black,
   noticeInfoBackground: colors.warmGrey,
   noticeInfoText: colors.almostBlack,
   noticeTipBackground: "#fce5bb",
@@ -103,6 +92,7 @@ export const base = {
 
 export const light = {
   ...base,
+  isDark: false,
   background: colors.white,
   secondaryBackground: colors.warmGrey,
   link: colors.primary,
@@ -160,6 +150,7 @@ export const light = {
 
 export const dark = {
   ...base,
+  isDark: true,
   background: colors.almostBlack,
   secondaryBackground: colors.black50,
   link: "#137FFB",
