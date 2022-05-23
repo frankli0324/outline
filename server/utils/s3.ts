@@ -2,11 +2,31 @@ import util from "util";
 import AWS from "aws-sdk";
 import fetch from "fetch-with-proxy";
 import { v4 as uuidv4 } from "uuid";
-import Logger from "@server/logging/logger";
+import Logger from "@server/logging/Logger";
 
 // backward compatibility
-const AWS_S3_ACCELERATE_URL = process.env.AWS_S3_ACCELERATE_URL;
-const AWS_S3_UPLOAD_BUCKET_URL = process.env.AWS_S3_UPLOAD_BUCKET_URL;
+function removeBucketName(url: string | undefined) {
+  if (
+    !process.env.AWS_S3_FORCE_PATH_STYLE &&
+    process.env.AWS_S3_UPLOAD_BUCKET_NAME &&
+    url
+  ) {
+    const bucket_url = new URL(url);
+    if (bucket_url.hostname.startsWith(process.env.AWS_S3_UPLOAD_BUCKET_NAME)) {
+      bucket_url.hostname = bucket_url.hostname.substring(
+        process.env.AWS_S3_UPLOAD_BUCKET_NAME.length + 1
+      );
+      return bucket_url.toString();
+    }
+  }
+  return url;
+}
+const AWS_S3_ACCELERATE_URL = removeBucketName(
+  process.env.AWS_S3_ACCELERATE_URL
+);
+const AWS_S3_UPLOAD_BUCKET_URL = removeBucketName(
+  process.env.AWS_S3_UPLOAD_BUCKET_URL
+);
 const AWS_S3_UPLOAD_BUCKET_NAME = process.env.AWS_S3_UPLOAD_BUCKET_NAME;
 const AWS_S3_FORCE_PATH_STYLE = process.env.AWS_S3_FORCE_PATH_STYLE;
 
@@ -52,8 +72,6 @@ const s3public = new AWS.S3(s3config); // used only for signing public urls
 
 const getPresignedPostPromise = util
   .promisify(s3public.createPresignedPost)
-  .bind(s3public);
-const getSignedUrlPromise = s3public.getSignedUrlPromise
   .bind(s3public);
 
 export const getPresignedPost = async (
@@ -159,7 +177,7 @@ export const getSignedUrl = async (key: string, expiresInMs = 60) => {
     Expires: expiresInMs,
   };
 
-  return await getSignedUrlPromise("getObject", params);
+  return await s3public.getSignedUrlPromise("getObject", params);
 };
 
 // function assumes that acl is private
