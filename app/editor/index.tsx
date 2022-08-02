@@ -724,10 +724,55 @@ export class Editor extends React.PureComponent<
     if (this.state.suggestionsMenuOpen !== type) {
       return;
     }
-    this.setState((state) => ({
-      ...state,
-      suggestionsMenuOpen: false,
-    }));
+    this.setState({ emojiMenuOpen: false });
+  };
+
+  private handleOpenLinkMenu = () => {
+    this.setState({ blockMenuOpen: false, linkMenuOpen: true });
+  };
+
+  private handleCloseLinkMenu = () => {
+    this.setState({ linkMenuOpen: false });
+  };
+
+  private handleOpenBlockMenu = (search: string) => {
+    this.setState({ blockMenuOpen: true, blockMenuSearch: search });
+  };
+
+  private handleCloseBlockMenu = (insertNewLine?: boolean) => {
+    if (insertNewLine) {
+      const transaction = this.view.state.tr.split(
+        this.view.state.selection.to
+      );
+      this.view.dispatch(transaction);
+      this.view.focus();
+    }
+    if (!this.state.blockMenuOpen) {
+      return;
+    }
+    this.setState({ blockMenuOpen: false });
+  };
+
+  public focusAtStart = () => {
+    const selection = Selection.atStart(this.view.state.doc);
+    const transaction = this.view.state.tr.setSelection(selection);
+    this.view.dispatch(transaction);
+    this.view.focus();
+  };
+
+  public focusAtEnd = () => {
+    const selection = Selection.atEnd(this.view.state.doc);
+    const transaction = this.view.state.tr.setSelection(selection);
+    this.view.dispatch(transaction);
+    this.view.focus();
+  };
+
+  public getHeadings = () => {
+    return getHeadings(this.view.state.doc);
+  };
+
+  public getTasks = () => {
+    return getTasks(this.view.state.doc);
   };
 
   public render() {

@@ -5,8 +5,6 @@ import * as React from "react";
 import AvatarEditor from "react-avatar-editor";
 import Dropzone from "react-dropzone";
 import styled from "styled-components";
-import { s } from "@shared/styles";
-import { AttachmentPreset } from "@shared/types";
 import { AttachmentValidation } from "@shared/validations";
 import RootStore from "~/stores/RootStore";
 import Button from "~/components/Button";

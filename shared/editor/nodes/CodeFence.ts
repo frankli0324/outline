@@ -14,7 +14,6 @@ import clike from "refractor/lang/clike";
 import csharp from "refractor/lang/csharp";
 import css from "refractor/lang/css";
 import elixir from "refractor/lang/elixir";
-import erlang from "refractor/lang/erlang";
 import go from "refractor/lang/go";
 import graphql from "refractor/lang/graphql";
 import groovy from "refractor/lang/groovy";
@@ -24,8 +23,6 @@ import java from "refractor/lang/java";
 import javascript from "refractor/lang/javascript";
 import json from "refractor/lang/json";
 import kotlin from "refractor/lang/kotlin";
-import lisp from "refractor/lang/lisp";
-import lua from "refractor/lang/lua";
 import markup from "refractor/lang/markup";
 import nix from "refractor/lang/nix";
 import objectivec from "refractor/lang/objectivec";
@@ -40,7 +37,6 @@ import scala from "refractor/lang/scala";
 import solidity from "refractor/lang/solidity";
 import sql from "refractor/lang/sql";
 import swift from "refractor/lang/swift";
-import toml from "refractor/lang/toml";
 import typescript from "refractor/lang/typescript";
 import visualbasic from "refractor/lang/visual-basic";
 import yaml from "refractor/lang/yaml";
@@ -71,7 +67,6 @@ const DEFAULT_LANGUAGE = "javascript";
   clike,
   csharp,
   elixir,
-  erlang,
   go,
   graphql,
   groovy,
@@ -81,8 +76,6 @@ const DEFAULT_LANGUAGE = "javascript";
   javascript,
   json,
   kotlin,
-  lisp,
-  lua,
   markup,
   nix,
   objectivec,
@@ -97,7 +90,6 @@ const DEFAULT_LANGUAGE = "javascript";
   sql,
   solidity,
   swift,
-  toml,
   typescript,
   visualbasic,
   yaml,

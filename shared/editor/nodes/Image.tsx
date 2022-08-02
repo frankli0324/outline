@@ -3,8 +3,11 @@ import { InputRule } from "prosemirror-inputrules";
 import { Node as ProsemirrorNode, NodeSpec, NodeType } from "prosemirror-model";
 import { NodeSelection, EditorState, Plugin } from "prosemirror-state";
 import * as React from "react";
-import { sanitizeUrl } from "../../utils/urls";
-import { default as ImageComponent, Caption } from "../components/Image";
+import ImageZoom from "react-medium-image-zoom";
+import styled from "styled-components";
+import { getDataTransferFiles, getEventFiles } from "../../utils/files";
+import { AttachmentValidation } from "../../validations";
+import insertFiles, { Options } from "../commands/insertFiles";
 import { MarkdownSerializerState } from "../lib/markdown/serializer";
 import { ComponentProps, Dispatch } from "../types";
 import SimpleImage from "./SimpleImage";
@@ -330,10 +333,21 @@ export default class Image extends SimpleImage {
         if (!(state.selection instanceof NodeSelection)) {
           return false;
         }
-        const attrs = {
-          ...state.selection.node.attrs,
-          title: null,
-          layoutClass: "full-width",
+
+        // create an input element and click to trigger picker
+        const inputElement = document.createElement("input");
+        inputElement.type = "file";
+        inputElement.accept = AttachmentValidation.imageContentTypes.join(", ");
+        inputElement.onchange = (event) => {
+          const files = getEventFiles(event);
+          insertFiles(view, event, state.selection.from, files, {
+            uploadFile,
+            onFileUploadStart,
+            onFileUploadStop,
+            onShowToast,
+            dictionary: this.options.dictionary,
+            replaceExisting: true,
+          });
         };
         const { selection } = state;
         dispatch(state.tr.setNodeMarkup(selection.from, undefined, attrs));

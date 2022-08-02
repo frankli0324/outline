@@ -242,12 +242,6 @@ class User extends ParanoidModel {
     return stringToColor(this.id);
   }
 
-  get defaultCollectionPermission(): CollectionPermission {
-    return this.isViewer
-      ? CollectionPermission.Read
-      : CollectionPermission.ReadWrite;
-  }
-
   /**
    * Returns a code that can be used to delete this user account. The code will
    * be rotated when the user signs out.

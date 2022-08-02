@@ -23,9 +23,7 @@ function DocumentDelete({ document, onSubmit }: Props) {
   const [isArchiving, setArchiving] = React.useState(false);
   const { showToast } = useToasts();
   const canArchive = !document.isDraft && !document.isArchived;
-  const collection = document.collectionId
-    ? collections.get(document.collectionId)
-    : undefined;
+  const collection = collections.get(document.collectionId);
   const nestedDocumentsCount = collection
     ? collection.getDocumentChildren(document.id).length
     : 0;

@@ -3,7 +3,8 @@ import { Op } from "sequelize";
 import { FileOperationState } from "@shared/types";
 import Logger from "@server/logging/Logger";
 import { FileOperation } from "@server/models";
-import BaseTask, { TaskPriority, TaskSchedule } from "./BaseTask";
+import { FileOperationState } from "@server/models/FileOperation";
+import BaseTask, { TaskPriority } from "./BaseTask";
 
 type Props = {
   limit: number;

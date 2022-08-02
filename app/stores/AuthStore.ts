@@ -223,7 +223,9 @@ export default class AuthStore {
   };
 
   @action
-  requestDelete = () => client.post(`/users.requestDelete`);
+  requestDelete = () => {
+    return client.post(`/users.requestDelete`);
+  };
 
   @action
   deleteUser = async (data: { code: string }) => {

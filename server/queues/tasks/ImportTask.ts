@@ -261,12 +261,6 @@ export default abstract class ImportTask extends BaseTask<Props> {
           Logger.debug("task", `ImportTask persisting collection ${item.id}`);
           let description = item.description;
 
-          // Description can be markdown text or a Prosemirror object if coming
-          // from JSON format. In that case we need to serialize to Markdown.
-          if (description instanceof Object) {
-            description = serializer.serialize(description);
-          }
-
           if (description) {
             // Check all of the attachments we've created against urls in the text
             // and replace them out with attachment redirect urls before saving.
@@ -293,21 +287,6 @@ export default abstract class ImportTask extends BaseTask<Props> {
             }
           }
 
-          const options: { urlId?: string } = {};
-          if (item.urlId) {
-            const existing = await Collection.unscoped().findOne({
-              attributes: ["id"],
-              transaction,
-              where: {
-                urlId: item.urlId,
-              },
-            });
-
-            if (!existing) {
-              options.urlId = item.urlId;
-            }
-          }
-
           // check if collection with name exists
           const response = await Collection.findOrCreate({
             where: {
@@ -315,16 +294,12 @@ export default abstract class ImportTask extends BaseTask<Props> {
               name: item.name,
             },
             defaults: {
-              ...options,
               id: item.id,
-              description: description
-                ? truncate(description, {
-                    length: CollectionValidation.maxDescriptionLength,
-                  })
-                : null,
+              description: truncate(description, {
+                length: CollectionValidation.maxDescriptionLength,
+              }),
               createdById: fileOperation.userId,
-              permission: CollectionPermission.ReadWrite,
-              importId: fileOperation.id,
+              permission: "read_write",
             },
             transaction,
           });
@@ -339,17 +314,12 @@ export default abstract class ImportTask extends BaseTask<Props> {
             const name = `${item.name} (Imported)`;
             collection = await Collection.create(
               {
-                ...options,
                 id: item.id,
                 description,
-                color: item.color,
-                icon: item.icon,
-                sort: item.sort,
                 teamId: fileOperation.teamId,
                 createdById: fileOperation.userId,
                 name,
-                permission: item.permission ?? CollectionPermission.ReadWrite,
-                importId: fileOperation.id,
+                permission: "read_write",
               },
               { transaction }
             );
@@ -403,23 +373,7 @@ export default abstract class ImportTask extends BaseTask<Props> {
             );
           }
 
-          const options: { urlId?: string } = {};
-          if (item.urlId) {
-            const existing = await Document.unscoped().findOne({
-              attributes: ["id"],
-              transaction,
-              where: {
-                urlId: item.urlId,
-              },
-            });
-
-            if (!existing) {
-              options.urlId = item.urlId;
-            }
-          }
-
           const document = await documentCreator({
-            ...options,
             source: "import",
             id: item.id,
             title: item.title,
@@ -429,7 +383,6 @@ export default abstract class ImportTask extends BaseTask<Props> {
             updatedAt: item.updatedAt ?? item.createdAt,
             publishedAt: item.updatedAt ?? item.createdAt ?? new Date(),
             parentDocumentId: item.parentDocumentId,
-            importId: fileOperation.id,
             user,
             ip,
             transaction,

@@ -1,14 +1,5 @@
-import { subMinutes } from "date-fns";
-import { computed, action, observable } from "mobx";
-import { now } from "mobx-utils";
-import {
-  NotificationEventDefaults,
-  NotificationEventType,
-  UserPreference,
-  UserPreferences,
-} from "@shared/types";
-import type { Role, NotificationSettings } from "@shared/types";
-import { client } from "~/utils/ApiClient";
+import { computed, observable } from "mobx";
+import type { Role } from "@shared/types";
 import ParanoidModel from "./ParanoidModel";
 import Field from "./decorators/Field";
 
