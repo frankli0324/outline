@@ -86,7 +86,7 @@
     "core-js": "^3.10.2",
     "crypto-js": "^4.1.1",
     "datadog-metrics": "^0.9.3",
-    "date-fns": "^2.25.0",
+    "date-fns": "^2.29.2",
     "dotenv": "^4.0.0",
     "email-providers": "^1.13.1",
     "emoji-regex": "^10.0.0",
