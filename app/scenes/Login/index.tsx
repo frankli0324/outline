@@ -12,15 +12,17 @@ import ButtonLarge from "~/components/ButtonLarge";
 import Fade from "~/components/Fade";
 import Flex from "~/components/Flex";
 import Heading from "~/components/Heading";
+import OutlineIcon from "~/components/Icons/OutlineIcon";
 import LoadingIndicator from "~/components/LoadingIndicator";
-import NoticeAlert from "~/components/NoticeAlert";
-import OutlineLogo from "~/components/OutlineLogo";
 import PageTitle from "~/components/PageTitle";
 import TeamLogo from "~/components/TeamLogo";
 import Text from "~/components/Text";
 import env from "~/env";
+import useLastVisitedPath from "~/hooks/useLastVisitedPath";
 import useQuery from "~/hooks/useQuery";
 import useStores from "~/hooks/useStores";
+import { draggableOnDesktop } from "~/styles";
+import Desktop from "~/utils/Desktop";
 import isCloudHosted from "~/utils/isCloudHosted";
 import { changeLanguage, detectLanguage } from "~/utils/language";
 import AuthenticationProvider from "./AuthenticationProvider";
@@ -30,21 +32,17 @@ function Header({ config }: { config?: Config | undefined }) {
   const { t } = useTranslation();
   const isSubdomain = !!config?.hostname;
 
-  if (!isCloudHosted || parseDomain(window.location.origin).custom) {
+  if (
+    !isCloudHosted ||
+    parseDomain(window.location.origin).custom ||
+    Desktop.isElectron()
+  ) {
     return null;
   }
 
-  if (isSubdomain) {
-    return (
-      <Back href={env.URL}>
-        <BackIcon color="currentColor" /> {t("Back to home")}
-      </Back>
-    );
-  }
-
   return (
-    <Back href="https://www.getoutline.com">
-      <BackIcon color="currentColor" /> {t("Back to website")}
+    <Back href={isSubdomain ? env.URL : "https://www.getoutline.com"}>
+      <BackIcon color="currentColor" /> {t("Back to home")}
     </Back>
   );
 }
@@ -62,6 +60,9 @@ function Login({ children }: Props) {
   const [error, setError] = React.useState(null);
   const [emailLinkSentTo, setEmailLinkSentTo] = React.useState("");
   const isCreate = location.pathname === "/create";
+  const rememberLastPath = !!auth.user?.preferences?.rememberLastPath;
+  const [lastVisitedPath] = useLastVisitedPath();
+
   const handleReset = React.useCallback(() => {
     setEmailLinkSentTo("");
   }, []);
@@ -91,6 +92,14 @@ function Login({ children }: Props) {
     }
   }, [query]);
 
+  if (
+    auth.authenticated &&
+    rememberLastPath &&
+    lastVisitedPath !== location.pathname
+  ) {
+    return <Redirect to={lastVisitedPath} />;
+  }
+
   if (auth.authenticated && auth.team?.defaultCollectionId) {
     return <Redirect to={`/collection/${auth.team?.defaultCollectionId}`} />;
   }
@@ -105,7 +114,8 @@ function Login({ children }: Props) {
         <Header />
         <Centered align="center" justify="center" column auto>
           <PageTitle title={t("Login")} />
-          <NoticeAlert>
+          <Heading centered>{t("Error")}</Heading>
+          <Note>
             {t("Failed to load configuration.")}
             {!isCloudHosted && (
               <p>
@@ -114,7 +124,7 @@ function Login({ children }: Props) {
                 )}
               </p>
             )}
-          </NoticeAlert>
+          </Note>
         </Centered>
       </Background>
     );
@@ -124,6 +134,26 @@ function Login({ children }: Props) {
   // indicator here that's delayed by 250ms
   if (!config) {
     return <LoadingIndicator />;
+  }
+
+  const isCustomDomain = parseDomain(window.location.origin).custom;
+
+  // Unmapped custom domain
+  if (isCloudHosted && isCustomDomain && !config.name) {
+    return (
+      <Background>
+        <Header config={config} />
+        <Centered align="center" justify="center" column auto>
+          <PageTitle title={t("Custom domain setup")} />
+          <Heading centered>{t("Almost there")}…</Heading>
+          <Note>
+            {t(
+              "Your custom domain is successfully pointing at Outline. To complete the setup process please contact support."
+            )}
+          </Note>
+        </Centered>
+      </Background>
+    );
   }
 
   const hasMultipleProviders = config.providers.length > 1;
@@ -160,28 +190,32 @@ function Login({ children }: Props) {
     <Background>
       <Header config={config} />
       <Centered align="center" justify="center" gap={12} column auto>
-        <PageTitle title={t("Login")} />
+        <PageTitle
+          title={config.name ? `${config.name} – ${t("Login")}` : t("Login")}
+        />
         <Logo>
-          {env.TEAM_LOGO && !isCloudHosted ? (
-            <TeamLogo src={env.TEAM_LOGO} />
+          {config.logo && !isCreate ? (
+            <TeamLogo size={48} src={config.logo} />
           ) : (
-            <OutlineLogo size={38} fill="currentColor" />
+            <OutlineIcon size={48} />
           )}
         </Logo>
         {isCreate ? (
           <>
-            <StyledHeading centered>{t("Create an account")}</StyledHeading>
-            <GetStarted>
+            <StyledHeading as="h2" centered>
+              {t("Create a workspace")}
+            </StyledHeading>
+            <Content>
               {t(
-                "Get started by choosing a sign-in method for your new team below…"
+                "Get started by choosing a sign-in method for your new workspace below…"
               )}
-            </GetStarted>
+            </Content>
           </>
         ) : (
           <>
-            <StyledHeading centered>
+            <StyledHeading as="h2" centered>
               {t("Login to {{ authProviderName }}", {
-                authProviderName: config.name || "Outline",
+                authProviderName: config.name || env.APP_NAME,
               })}
             </StyledHeading>
             {children?.(config)}
@@ -243,23 +277,27 @@ const CheckEmailIcon = styled(EmailIcon)`
 
 const Background = styled(Fade)`
   width: 100vw;
-  height: 100vh;
+  height: 100%;
   background: ${(props) => props.theme.background};
   display: flex;
+  ${draggableOnDesktop()}
 `;
 
 const Logo = styled.div`
-  height: 38px;
+  margin-bottom: -4px;
 `;
 
-const GetStarted = styled(Text)`
+const Content = styled(Text)`
+  color: ${(props) => props.theme.textSecondary};
   text-align: center;
-  margin-top: -12px;
+  margin-top: -8px;
 `;
 
 const Note = styled(Text)`
+  color: ${(props) => props.theme.textTertiary};
   text-align: center;
   font-size: 14px;
+  margin-top: 8px;
 
   em {
     font-style: normal;

@@ -1,6 +1,5 @@
-import TestServer from "fetch-test-server";
+import { CollectionPermission } from "@shared/types";
 import { CollectionUser } from "@server/models";
-import webService from "@server/services/web";
 import {
   buildUser,
   buildDocument,
@@ -8,12 +7,10 @@ import {
   buildAdmin,
   buildCollection,
 } from "@server/test/factories";
-import { flushdb, seed } from "@server/test/support";
 
-const app = webService();
-const server = new TestServer(app.callback());
-beforeEach(() => flushdb());
-afterAll(() => server.close());
+import { seed, getTestServer } from "@server/test/support";
+
+const server = getTestServer();
 
 describe("#shares.list", () => {
   it("should only return shares created by user", async () => {
@@ -163,7 +160,7 @@ describe("#shares.create", () => {
       createdById: user.id,
       collectionId: collection.id,
       userId: user.id,
-      permission: "read",
+      permission: CollectionPermission.Read,
     });
     const res = await server.post("/api/shares.create", {
       body: {
@@ -467,6 +464,70 @@ it("should require authorization", async () => {
 });
 
 describe("#shares.update", () => {
+  it("should fail for invalid urlId", async () => {
+    const { user, document } = await seed();
+    const share = await buildShare({
+      documentId: document.id,
+      teamId: user.teamId,
+    });
+    const res = await server.post("/api/shares.update", {
+      body: {
+        token: user.getJwtToken(),
+        id: share.id,
+        urlId: "url_id",
+      },
+    });
+    const body = await res.json();
+    expect(res.status).toEqual(400);
+    expect(body.message).toEqual(
+      "Must be only alphanumeric and dashes (urlId)"
+    );
+  });
+
+  it("should update urlId", async () => {
+    const { user, document } = await seed();
+    const share = await buildShare({
+      documentId: document.id,
+      teamId: user.teamId,
+    });
+    const res = await server.post("/api/shares.update", {
+      body: {
+        token: user.getJwtToken(),
+        id: share.id,
+        urlId: "url-id",
+      },
+    });
+    const body = await res.json();
+    expect(res.status).toEqual(200);
+    expect(body.data.urlId).toEqual("url-id");
+  });
+
+  it("should allow clearing urlId", async () => {
+    const { user, document } = await seed();
+    const share = await buildShare({
+      documentId: document.id,
+      teamId: user.teamId,
+    });
+    await server.post("/api/shares.update", {
+      body: {
+        token: user.getJwtToken(),
+        id: share.id,
+        urlId: "url-id",
+      },
+    });
+
+    const res = await server.post("/api/shares.update", {
+      body: {
+        token: user.getJwtToken(),
+        id: share.id,
+        urlId: null,
+      },
+    });
+    const body = await res.json();
+    expect(res.status).toEqual(200);
+    expect(body.data.urlId).toBeNull();
+  });
+
   it("should allow user to update a share", async () => {
     const { user, document } = await seed();
     const share = await buildShare({

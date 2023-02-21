@@ -4,7 +4,6 @@ import fetch from "fetch-with-proxy";
 import { compact } from "lodash";
 import { useAgent } from "request-filtering-agent";
 import { v4 as uuidv4 } from "uuid";
-import env from "@server/env";
 import Logger from "@server/logging/Logger";
 
 // backward compatibility
@@ -82,14 +81,13 @@ const getPresignedPostPromise: (
 export const getPresignedPost = async (
   key: string,
   acl: string,
+  maxUploadSize: number,
   contentType = "image"
 ) => {
   const params = {
     Bucket: process.env.AWS_S3_BUCKET_NAME,
     Conditions: compact([
-      process.env.AWS_S3_UPLOAD_MAX_SIZE
-        ? ["content-length-range", 0, +process.env.AWS_S3_UPLOAD_MAX_SIZE]
-        : undefined,
+      ["content-length-range", 0, maxUploadSize],
       ["starts-with", "$Content-Type", contentType],
       ["starts-with", "$Cache-Control", ""],
     ]),
@@ -116,21 +114,45 @@ const _publicS3Endpoint = (() => {
 
 export const publicS3Endpoint = () => _publicS3Endpoint;
 
-export const uploadToS3FromBuffer = async (
-  buffer: Buffer,
-  contentType: string,
-  key: string,
-  acl: string
-) => {
+const host = AWS_S3_UPLOAD_BUCKET_URL.replace("s3:", "localhost:").replace(
+  /\/$/,
+  ""
+);
+
+// support old path-style S3 uploads and new virtual host uploads by checking
+// for the bucket name in the endpoint url before appending.
+const isVirtualHost = host.includes(AWS_S3_UPLOAD_BUCKET_NAME);
+
+if (isVirtualHost) {
+  return host;
+}
+
+return `${host}/${isServerUpload && isDocker ? "s3/" : ""
+  }${AWS_S3_UPLOAD_BUCKET_NAME}`;
+};
+
+export const uploadToS3 = async ({
+  body,
+  contentLength,
+  contentType,
+  key,
+  acl,
+}: {
+  body: S3.Body;
+  contentLength: number;
+  contentType: string;
+  key: string;
+  acl: string;
+}) => {
   await s3
     .putObject({
       ACL: acl,
       Bucket: AWS_S3_BUCKET_NAME,
       Key: key,
       ContentType: contentType,
-      ContentLength: buffer.length,
+      ContentLength: contentLength,
       ContentDisposition: "attachment",
-      Body: buffer,
+      Body: body,
     })
     .promise();
   const endpoint = publicS3Endpoint();
@@ -142,12 +164,8 @@ export const uploadToS3FromUrl = async (
   key: string,
   acl: string
 ) => {
-  const endpoint = publicS3Endpoint();
-  if (
-    url.startsWith("/api") ||
-    url.startsWith(endpoint) ||
-    url.startsWith(env.DEFAULT_AVATAR_HOST)
-  ) {
+  const endpoint = publicS3Endpoint(true);
+  if (url.startsWith("/api") || url.startsWith(endpoint)) {
     return;
   }
 
@@ -204,15 +222,14 @@ export const getAWSKeyForFileOp = (teamId: string, name: string) => {
   return `${bucket}/${teamId}/${uuidv4()}/${name}-export.zip`;
 };
 
-export const getFileByKey = async (key: string) => {
+export const getFileByKey = (key: string) => {
   const params = {
     Bucket: AWS_S3_BUCKET_NAME,
     Key: key,
   };
 
   try {
-    const data = await s3.getObject(params).promise();
-    return data.Body || null;
+    return s3.getObject(params).createReadStream();
   } catch (err) {
     Logger.error("Error getting file from S3 by key", err, {
       key,

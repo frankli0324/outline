@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 type MermaidState = {
   decorationSet: DecorationSet;
   diagramVisibility: Record<number, boolean>;
+  isDark: boolean;
 };
 
 function getNewState({
@@ -53,20 +54,22 @@ function getNewState({
 
         if (pluginState.diagramVisibility[diagramId] === false) {
           diagramWrapper.classList.add("diagram-hidden");
+          return diagramWrapper;
         }
 
-        import(
-          /* webpackChunkName: "mermaid" */
-          "mermaid"
-        ).then((module) => {
+        import("mermaid").then((module) => {
           module.default.initialize({
             startOnLoad: true,
             flowchart: {
               htmlLabels: false,
             },
-            themeVariables: {
-              fontFamily: "inherit",
+            // TODO: Make dynamic based on the width of the editor or remove in
+            // the future if Mermaid is able to handle this automatically.
+            gantt: {
+              useWidth: 700,
             },
+            theme: pluginState.isDark ? "dark" : "default",
+            fontFamily: "inherit",
           });
           try {
             module.default.render(
@@ -115,10 +118,17 @@ function getNewState({
   return {
     decorationSet: DecorationSet.create(doc, decorations),
     diagramVisibility: pluginState.diagramVisibility,
+    isDark: pluginState.isDark,
   };
 }
 
-export default function Mermaid({ name }: { name: string }) {
+export default function Mermaid({
+  name,
+  isDark,
+}: {
+  name: string;
+  isDark: boolean;
+}) {
   let diagramShown = false;
 
   return new Plugin({
@@ -128,6 +138,7 @@ export default function Mermaid({ name }: { name: string }) {
         const pluginState: MermaidState = {
           decorationSet: DecorationSet.create(doc, []),
           diagramVisibility: {},
+          isDark,
         };
         return pluginState;
       },
@@ -143,7 +154,13 @@ export default function Mermaid({ name }: { name: string }) {
           transaction.docChanged && [nodeName, previousNodeName].includes(name);
         const ySyncEdit = !!transaction.getMeta("y-sync$");
         const mermaidMeta = transaction.getMeta("mermaid");
+        const themeMeta = transaction.getMeta("theme");
         const diagramToggled = mermaidMeta?.toggleDiagram !== undefined;
+        const themeToggled = themeMeta?.isDark !== undefined;
+
+        if (themeToggled) {
+          pluginState.isDark = themeMeta.isDark;
+        }
 
         if (diagramToggled) {
           pluginState.diagramVisibility[
@@ -151,7 +168,13 @@ export default function Mermaid({ name }: { name: string }) {
           ] = !pluginState.diagramVisibility[mermaidMeta.toggleDiagram];
         }
 
-        if (!diagramShown || codeBlockChanged || diagramToggled || ySyncEdit) {
+        if (
+          !diagramShown ||
+          themeToggled ||
+          codeBlockChanged ||
+          diagramToggled ||
+          ySyncEdit
+        ) {
           diagramShown = true;
           return getNewState({
             doc: transaction.doc,
@@ -166,6 +189,7 @@ export default function Mermaid({ name }: { name: string }) {
             transaction.doc
           ),
           diagramVisibility: pluginState.diagramVisibility,
+          isDark: pluginState.isDark,
         };
       },
     },
@@ -179,6 +203,7 @@ export default function Mermaid({ name }: { name: string }) {
           view.dispatch(view.state.tr.setMeta("mermaid", { loaded: true }));
         }, 10);
       }
+
       return {};
     },
     props: {

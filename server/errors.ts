@@ -1,5 +1,11 @@
 import httpErrors from "http-errors";
 
+export function InternalError(message = "Internal error") {
+  return httpErrors(500, message, {
+    id: "internal_error",
+  });
+}
+
 export function AuthenticationError(
   message = "Authentication required",
   redirectUrl = "/"
@@ -94,6 +100,14 @@ export function ParamRequiredError(message = "Required parameter missing") {
 export function ValidationError(message = "Validation failed") {
   return httpErrors(400, message, {
     id: "validation_error",
+  });
+}
+
+export function IncorrectEditionError(
+  message = "Functionality not available in this edition"
+) {
+  return httpErrors(402, message, {
+    id: "incorrect_edition",
   });
 }
 

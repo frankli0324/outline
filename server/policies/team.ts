@@ -1,3 +1,5 @@
+import env from "@server/env";
+import { IncorrectEditionError } from "@server/errors";
 import { Team, User } from "@server/models";
 import { allow } from "./cancan";
 
@@ -8,6 +10,12 @@ allow(User, "share", Team, (user, team) => {
     return false;
   }
   return team.sharing;
+});
+
+allow(User, "createTeam", Team, () => {
+  if (!env.isCloudHosted()) {
+    throw IncorrectEditionError("createTeam only available on cloud");
+  }
 });
 
 allow(User, ["update", "manage"], Team, (user, team) => {

@@ -30,6 +30,9 @@ export const CollectionValidation = {
 export const DocumentValidation = {
   /** The maximum length of the document title */
   maxTitleLength: 100,
+
+  /** The maximum size of the collaborative document state */
+  maxStateLength: 1500 * 1024,
 };
 
 export const PinValidation = {
@@ -40,4 +43,14 @@ export const PinValidation = {
 export const TeamValidation = {
   /** The maximum number of domains per team */
   maxDomains: 10,
+};
+
+export const UserValidation = {
+  /** The maximum number of invites per request */
+  maxInvitesPerRequest: 20,
+};
+
+export const WebhookSubscriptionValidation = {
+  /** The maximum number of webhooks per team */
+  maxSubscriptions: 10,
 };

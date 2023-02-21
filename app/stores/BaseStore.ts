@@ -1,15 +1,13 @@
 import invariant from "invariant";
-import { orderBy } from "lodash";
+import { lowerFirst, orderBy } from "lodash";
 import { observable, action, computed, runInAction } from "mobx";
 import { Class } from "utility-types";
 import RootStore from "~/stores/RootStore";
 import BaseModel from "~/models/BaseModel";
 import Policy from "~/models/Policy";
-import { PaginationParams } from "~/types";
+import { PaginationParams, PartialWithId } from "~/types";
 import { client } from "~/utils/ApiClient";
 import { AuthorizationError, NotFoundError } from "~/utils/errors";
-
-type PartialWithId<T> = Partial<T> & { id: string };
 
 export enum RPCAction {
   Info = "info",
@@ -21,10 +19,6 @@ export enum RPCAction {
 }
 
 type FetchPageParams = PaginationParams & Record<string, any>;
-
-function modelNameFromClassName(string: string) {
-  return string.charAt(0).toLowerCase() + string.slice(1);
-}
 
 export const DEFAULT_PAGINATION_LIMIT = 25;
 
@@ -63,7 +57,7 @@ export default abstract class BaseStore<T extends BaseModel> {
   constructor(rootStore: RootStore, model: Class<T>) {
     this.rootStore = rootStore;
     this.model = model;
-    this.modelName = modelNameFromClassName(model.name);
+    this.modelName = lowerFirst(model.name).replace(/\d$/, "");
 
     if (!this.apiEndpoint) {
       this.apiEndpoint = `${this.modelName}s`;

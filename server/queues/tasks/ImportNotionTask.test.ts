@@ -2,17 +2,17 @@ import fs from "fs";
 import path from "path";
 import { FileOperation } from "@server/models";
 import { buildFileOperation } from "@server/test/factories";
-import { flushdb } from "@server/test/support";
+import { setupTestDatabase } from "@server/test/support";
 import ImportNotionTask from "./ImportNotionTask";
 
-beforeEach(() => flushdb());
+setupTestDatabase();
 
 describe("ImportNotionTask", () => {
   it("should import successfully from a Markdown export", async () => {
     const fileOperation = await buildFileOperation();
-    Object.defineProperty(fileOperation, "buffer", {
+    Object.defineProperty(fileOperation, "stream", {
       get() {
-        return fs.readFileSync(
+        return fs.createReadStream(
           path.resolve(
             __dirname,
             "..",
@@ -45,9 +45,9 @@ describe("ImportNotionTask", () => {
 
   it("should import successfully from a HTML export", async () => {
     const fileOperation = await buildFileOperation();
-    Object.defineProperty(fileOperation, "buffer", {
+    Object.defineProperty(fileOperation, "stream", {
       get() {
-        return fs.readFileSync(
+        return fs.createReadStream(
           path.resolve(
             __dirname,
             "..",

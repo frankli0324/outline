@@ -1,13 +1,11 @@
 import invariant from "invariant";
-import { UniqueConstraintError } from "sequelize";
 import WelcomeEmail from "@server/emails/templates/WelcomeEmail";
 import {
   AuthenticationError,
   InvalidAuthenticationError,
-  EmailAuthenticationRequiredError,
   AuthenticationProviderDisabledError,
 } from "@server/errors";
-import { APM } from "@server/logging/tracing";
+import { traceFunction } from "@server/logging/tracing";
 import { AuthenticationProvider, Collection, Team, User } from "@server/models";
 import teamProvisioner from "./teamProvisioner";
 import userProvisioner from "./userProvisioner";
@@ -135,15 +133,16 @@ async function accountProvisioner({
       isAdmin: isNewTeam || undefined,
       avatarUrl: userParams.avatarUrl,
       teamId: team.id,
-      emailMatchOnly,
       ip,
-      authentication: {
-        authenticationProviderId: authenticationProvider.id,
-        ...authenticationParams,
-        expiresAt: authenticationParams.expiresIn
-          ? new Date(Date.now() + authenticationParams.expiresIn * 1000)
-          : undefined,
-      },
+      authentication: emailMatchOnly
+        ? undefined
+        : {
+            authenticationProviderId: authenticationProvider.id,
+            ...authenticationParams,
+            expiresAt: authenticationParams.expiresIn
+              ? new Date(Date.now() + authenticationParams.expiresIn * 1000)
+              : undefined,
+          },
     });
     const { isNewUser, user } = result;
 
@@ -181,29 +180,10 @@ async function accountProvisioner({
       isNewTeam,
     };
   } catch (err) {
-    if (err instanceof UniqueConstraintError) {
-      const exists = await User.findOne({
-        where: {
-          email: userParams.email,
-          teamId: team.id,
-        },
-      });
-
-      if (exists) {
-        throw EmailAuthenticationRequiredError(
-          "Email authentication required",
-          team.url
-        );
-      } else {
-        throw AuthenticationError(err.message, team.url);
-      }
-    }
-
-    throw err;
+    throw AuthenticationError(err.message);
   }
 }
 
-export default APM.traceFunction({
-  serviceName: "command",
+export default traceFunction({
   spanName: "accountProvisioner",
 })(accountProvisioner);

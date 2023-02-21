@@ -19,7 +19,18 @@ function isLinkClose(token: Token) {
 
 function isAttachment(token: Token) {
   const href = token.attrGet("href");
-  return href?.includes("attachments.redirect");
+  if (href?.includes("display=link")) {
+    return false;
+  }
+
+  return (
+    // internal
+    href?.startsWith("/api/attachments.redirect") ||
+    // external (public share are pre-signed and this is a reasonable way of detecting them)
+    ((href?.startsWith(env.AWS_S3_UPLOAD_BUCKET_URL) ||
+      href?.startsWith(env.AWS_S3_ACCELERATE_URL)) &&
+      href?.includes("X-Amz-Signature"))
+  );
 }
 
 export default function linksToAttachments(md: MarkdownIt) {

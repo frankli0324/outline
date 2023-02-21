@@ -1,9 +1,6 @@
-import { escapeRegExp } from "lodash";
-import { APM } from "@server/logging/tracing";
+import { traceFunction } from "@server/logging/tracing";
 import { Document } from "@server/models";
-import Attachment from "@server/models/Attachment";
-import parseAttachmentIds from "@server/utils/parseAttachmentIds";
-import { getSignedUrl } from "@server/utils/s3";
+import DocumentHelper from "@server/models/helpers/DocumentHelper";
 import presentUser from "./user";
 
 type Options = {
@@ -21,10 +18,7 @@ async function replaceImageAttachments(text: string) {
         const signedUrl = await getSignedUrl(attachment.key, 3600);
         text = text.replace(
           new RegExp(escapeRegExp(attachment.redirectUrl), "g"),
-          // keep "attachments.redirect" string for files in shared urls to be recognized correctly
-          // this behavior should be changed upon switching to `json` based document transfer
-          //     in `documents.info` endpoint
-          signedUrl + "#attachments.redirect"
+          signedUrl
         );
       }
     })
@@ -33,7 +27,7 @@ async function replaceImageAttachments(text: string) {
   return text;
 }
 
-async function present(
+async function presentDocument(
   document: Document,
   options: Options | null | undefined = {}
 ) {
@@ -41,9 +35,11 @@ async function present(
     isPublic: false,
     ...options,
   };
-  await document.migrateVersion();
   const text = options.isPublic
-    ? await replaceImageAttachments(document.text)
+    ? await DocumentHelper.attachmentsToSignedUrls(
+      document.text,
+      document.teamId
+    )
     : document.text;
 
   const data: Record<string, any> = {
@@ -86,7 +82,6 @@ async function present(
   return data;
 }
 
-export default APM.traceFunction({
-  serviceName: "presenter",
-  spanName: "document",
-})(present);
+export default traceFunction({
+  spanName: "presenters",
+})(presentDocument);

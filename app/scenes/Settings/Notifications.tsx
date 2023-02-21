@@ -52,12 +52,17 @@ function Notifications() {
       ),
     },
     {
+      event: "emails.export_completed",
+      title: t("Export completed"),
+      description: t(
+        "Receive a notification when an export you requested has been completed"
+      ),
+    },
+    {
       visible: isCloudHosted,
       event: "emails.onboarding",
       title: t("Getting started"),
-      description: t(
-        "Tips on getting started with Outline’s features and functionality"
-      ),
+      description: t("Tips on getting started with features and functionality"),
     },
     {
       visible: isCloudHosted,

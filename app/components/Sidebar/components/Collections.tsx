@@ -48,10 +48,10 @@ function Collections() {
       <Header id="collections" title={t("Collections")}>
         <Relative>
           <PaginatedList
+            fetch={collections.fetchPage}
+            options={{ limit: 25 }}
             aria-label={t("Collections")}
             items={collections.orderedData}
-            fetch={collections.fetchPage}
-            options={{ limit: 100 }}
             loading={<PlaceholderCollections />}
             heading={
               isDraggingAnyCollection ? (
