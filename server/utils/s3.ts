@@ -1,5 +1,5 @@
 import util from "util";
-import AWS from "aws-sdk";
+import AWS, { S3 } from "aws-sdk";
 import fetch from "fetch-with-proxy";
 import { compact } from "lodash";
 import { useAgent } from "request-filtering-agent";
@@ -114,23 +114,6 @@ const _publicS3Endpoint = (() => {
 
 export const publicS3Endpoint = () => _publicS3Endpoint;
 
-const host = AWS_S3_UPLOAD_BUCKET_URL.replace("s3:", "localhost:").replace(
-  /\/$/,
-  ""
-);
-
-// support old path-style S3 uploads and new virtual host uploads by checking
-// for the bucket name in the endpoint url before appending.
-const isVirtualHost = host.includes(AWS_S3_UPLOAD_BUCKET_NAME);
-
-if (isVirtualHost) {
-  return host;
-}
-
-return `${host}/${isServerUpload && isDocker ? "s3/" : ""
-  }${AWS_S3_UPLOAD_BUCKET_NAME}`;
-};
-
 export const uploadToS3 = async ({
   body,
   contentLength,
@@ -164,7 +147,7 @@ export const uploadToS3FromUrl = async (
   key: string,
   acl: string
 ) => {
-  const endpoint = publicS3Endpoint(true);
+  const endpoint = publicS3Endpoint();
   if (url.startsWith("/api") || url.startsWith(endpoint)) {
     return;
   }
