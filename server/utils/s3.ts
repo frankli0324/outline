@@ -1,5 +1,5 @@
 import util from "util";
-import AWS from "aws-sdk";
+import AWS, { S3 } from "aws-sdk";
 import fetch from "fetch-with-proxy";
 import { compact } from "lodash";
 import { useAgent } from "request-filtering-agent";
