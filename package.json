@@ -84,7 +84,7 @@
     "command-score": "^0.1.2",
     "compressorjs": "^1.1.1",
     "copy-to-clipboard": "^3.3.3",
-    "core-js": "^3.30.0",
+    "core-js": "^3.28.0",
     "crypto-js": "^4.1.1",
     "datadog-metrics": "^0.11.0",
     "date-fns": "^2.25.0",
@@ -349,5 +349,5 @@
     "qs": "6.9.7",
     "rollup": "^3.14.0"
   },
-  "version": "0.65.2"
+  "version": "0.68.0"
 }
