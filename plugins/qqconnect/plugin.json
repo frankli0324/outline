@@ -1,0 +1,9 @@
+{
+  "name": "QQ Connect",
+  "description": "Adds QQ connect authentication provider.",
+  "requiredEnvVars": [
+    "QQ_CLIENT_ID",
+    "QQ_CLIENT_SECRET",
+    "QQ_SUBDOMAIN"
+  ]
+}
