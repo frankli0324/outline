@@ -514,6 +514,17 @@ export class Environment {
    */
   public OIDC_SCOPES = process.env.OIDC_SCOPES ?? "openid profile email";
 
+  @IsOptional()
+  @CannotUseWithout("QQ_CLIENT_SECRET")
+  @CannotUseWithout("QQ_SUBDOMAIN")
+  public QQ_CLIENT_ID = this.toOptionalString(process.env.QQ_CLIENT_ID)
+
+  @IsOptional()
+  @CannotUseWithout("QQ_CLIENT_ID")
+  public QQ_CLIENT_SECRET = this.toOptionalString(process.env.QQ_CLIENT_SECRET)
+
+  public QQ_SUBDOMAIN = this.toOptionalString(process.env.QQ_SUBDOMAIN ?? "example.com")
+
   /**
    * A string representing the version of the software.
    *
