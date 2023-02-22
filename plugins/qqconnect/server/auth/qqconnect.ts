@@ -25,12 +25,18 @@ const QQ_SUBDOMAIN = env.QQ_SUBDOMAIN;
 
 Strategy.prototype.userProfile = async function (accessToken, done) {
   try {
-    const response = await request(env.OIDC_USERINFO_URI ?? "", accessToken);
-    return done(null, response);
+    const profile = await (await fetch(
+      "https://graph.qq.com/oauth2.0/me?fmt=json&access_token=" + accessToken
+    )).json();
+    done(null, profile);
   } catch (err) {
     return done(err);
   }
 };
+
+Strategy.prototype.tokenParams = function (_options: object) {
+  return { 'fmt': 'json' };
+}
 
 if (QQ_CLIENT_ID && QQ_CLIENT_SECRET) {
   passport.use(
