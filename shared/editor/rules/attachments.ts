@@ -27,9 +27,7 @@ function isAttachment(token: Token) {
     // internal
     href?.startsWith("/api/attachments.redirect") ||
     // external (public share are pre-signed and this is a reasonable way of detecting them)
-    ((href?.startsWith(env.AWS_S3_UPLOAD_BUCKET_URL) ||
-      href?.startsWith(env.AWS_S3_ACCELERATE_URL)) &&
-      href?.includes("X-Amz-Signature"))
+    href?.includes("X-Amz-Signature")
   );
 }
 
