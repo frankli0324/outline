@@ -19,9 +19,9 @@ import {
 const router = new Router();
 const providerName = "qqconnect";
 
-const QQ_CLIENT_ID = process.env.QQ_CLIENT_ID;
-const QQ_CLIENT_SECRET = process.env.QQ_CLIENT_SECRET;
-const QQ_SUBDOMAIN = process.env.QQ_SUBDOMAIN || "example.com";
+const QQ_CLIENT_ID = env.QQ_CLIENT_ID;
+const QQ_CLIENT_SECRET = env.QQ_CLIENT_SECRET;
+const QQ_SUBDOMAIN = env.QQ_SUBDOMAIN;
 
 Strategy.prototype.userProfile = async function (accessToken, done) {
   try {
