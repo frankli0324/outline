@@ -23,7 +23,12 @@ function isAttachment(token: Token) {
     return false;
   }
 
-  return href?.includes("attachments.redirect");
+  return (
+    // internal
+    href?.startsWith("/api/attachments.redirect") ||
+    // external (public share are pre-signed and this is a reasonable way of detecting them)
+    href?.includes("X-Amz-Signature")
+  );
 }
 
 export default function linksToAttachments(md: MarkdownIt) {
