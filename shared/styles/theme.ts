@@ -48,9 +48,10 @@ const spacing = {
   vpadding: "1.5vw",
   hpadding: "1.875vw",
   sidebarWidth: 260,
+  sidebarRightWidth: 300,
   sidebarCollapsedWidth: 16,
   sidebarMinWidth: 200,
-  sidebarMaxWidth: 400,
+  sidebarMaxWidth: 600,
 };
 
 const buildBaseTheme = (input: Partial<Colors>) => {
@@ -124,6 +125,9 @@ export const buildLightTheme = (input: Partial<Colors>): DefaultTheme => {
     backdrop: "rgba(0, 0, 0, 0.2)",
     shadow: "rgba(0, 0, 0, 0.2)",
 
+    commentBackground: colors.warmGrey,
+    commentActiveBackground: "#d7e0ea",
+
     modalBackdrop: colors.black10,
     modalBackground: colors.white,
     modalShadow:
@@ -138,6 +142,7 @@ export const buildLightTheme = (input: Partial<Colors>): DefaultTheme => {
     inputBorder: colors.slateLight,
     inputBorderFocused: colors.slate,
     listItemHoverBackground: colors.warmGrey,
+    mentionBackground: colors.warmGrey,
     toolbarHoverBackground: colors.black,
     toolbarBackground: colors.almostBlack,
     toolbarInput: colors.white10,
@@ -189,6 +194,9 @@ export const buildDarkTheme = (input: Partial<Colors>): DefaultTheme => {
     backdrop: "rgba(0, 0, 0, 0.5)",
     shadow: "rgba(0, 0, 0, 0.6)",
 
+    commentBackground: colors.veryDarkBlue,
+    commentActiveBackground: colors.black,
+
     modalBackdrop: colors.black50,
     modalBackground: "#1f2128",
     modalShadow:
@@ -203,6 +211,7 @@ export const buildDarkTheme = (input: Partial<Colors>): DefaultTheme => {
     inputBorder: colors.slateDark,
     inputBorderFocused: colors.slate,
     listItemHoverBackground: colors.white10,
+    mentionBackground: colors.white10,
     toolbarHoverBackground: colors.slate,
     toolbarBackground: colors.white,
     toolbarInput: colors.black10,

@@ -3,9 +3,11 @@ import { observer } from "mobx-react";
 import * as React from "react";
 import styled, { useTheme } from "styled-components";
 import breakpoint from "styled-components-breakpoint";
+import { depths } from "@shared/styles";
 import Flex from "~/components/Flex";
 import ResizeBorder from "~/components/Sidebar/components/ResizeBorder";
-import usePersistedState from "~/hooks/usePersistedState";
+import useMobile from "~/hooks/useMobile";
+import useStores from "~/hooks/useStores";
 
 type Props = React.HTMLAttributes<HTMLDivElement> & {
   children: React.ReactNode;
@@ -14,11 +16,9 @@ type Props = React.HTMLAttributes<HTMLDivElement> & {
 
 function Right({ children, border, className }: Props) {
   const theme = useTheme();
-  const [width, setWidth] = usePersistedState(
-    "rightSidebarWidth",
-    theme.sidebarWidth
-  );
+  const { ui } = useStores();
   const [isResizing, setResizing] = React.useState(false);
+  const isMobile = useMobile();
   const maxWidth = theme.sidebarMaxWidth;
   const minWidth = theme.sidebarMinWidth + 16; // padding
 
@@ -30,14 +30,14 @@ function Right({ children, border, className }: Props) {
         Math.min(window.innerWidth - event.pageX, maxWidth),
         minWidth
       );
-      setWidth(width);
+      ui.setRightSidebarWidth(width);
     },
-    [minWidth, maxWidth, setWidth]
+    [minWidth, maxWidth, ui]
   );
 
   const handleReset = React.useCallback(() => {
-    setWidth(theme.sidebarWidth);
-  }, [setWidth, theme.sidebarWidth]);
+    ui.setRightSidebarWidth(theme.sidebarRightWidth);
+  }, [ui, theme.sidebarRightWidth]);
 
   const handleStopDrag = React.useCallback(() => {
     setResizing(false);
@@ -66,9 +66,9 @@ function Right({ children, border, className }: Props) {
 
   const style = React.useMemo(
     () => ({
-      width: `${width}px`,
+      width: `${ui.sidebarRightWidth}px`,
     }),
-    [width]
+    [ui.sidebarRightWidth]
   );
 
   return (
@@ -84,7 +84,7 @@ function Right({ children, border, className }: Props) {
               bounce: 0.2,
               duration: 0.6,
             },
-        width,
+        width: ui.sidebarRightWidth,
       }}
       exit={{
         width: 0,
@@ -94,11 +94,13 @@ function Right({ children, border, className }: Props) {
     >
       <Position style={style} column>
         {children}
-        <ResizeBorder
-          onMouseDown={handleMouseDown}
-          onDoubleClick={handleReset}
-          dir="right"
-        />
+        {!isMobile && (
+          <ResizeBorder
+            onMouseDown={handleMouseDown}
+            onDoubleClick={handleReset}
+            dir="right"
+          />
+        )}
       </Position>
     </Sidebar>
   );
@@ -110,19 +112,29 @@ const Position = styled(Flex)`
   bottom: 0;
 `;
 
-const Sidebar = styled(m.div)<{ $border?: boolean }>`
-  display: none;
-  position: relative;
+const Sidebar = styled(m.div)<{
+  $border?: boolean;
+}>`
+  display: flex;
   flex-shrink: 0;
   background: ${(props) => props.theme.background};
-  width: ${(props) => props.theme.sidebarWidth}px;
+  width: ${(props) => props.theme.sidebarRightWidth}px;
+  max-width: 70%;
   border-left: 1px solid ${(props) => props.theme.divider};
   transition: border-left 100ms ease-in-out;
   z-index: 1;
 
+  ${breakpoint("mobile", "tablet")`
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: ${depths.sidebar};
+  `}
+
   ${breakpoint("tablet")`
-    display: flex;
-  `};
+    position: relative;
+  `}
 `;
 
 export default observer(Right);

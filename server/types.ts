@@ -1,6 +1,6 @@
 import { ParameterizedContext, DefaultContext } from "koa";
 import { IRouterParamContext } from "koa-router";
-import { Transaction } from "sequelize/types";
+import { Transaction } from "sequelize";
 import { z } from "zod";
 import {
   CollectionSort,
@@ -279,6 +279,21 @@ export type PinEvent = BaseEvent & {
   collectionId?: string;
 };
 
+export type CommentEvent =
+  | (BaseEvent & {
+      name: "comments.create" | "comments.update";
+      modelId: string;
+      documentId: string;
+      actorId: string;
+    })
+  | (BaseEvent & {
+      name: "comments.delete";
+      modelId: string;
+      documentId: string;
+      actorId: string;
+      collectionId: string;
+    });
+
 export type StarEvent = BaseEvent & {
   name: "stars.create" | "stars.update" | "stars.delete";
   modelId: string;
@@ -332,6 +347,7 @@ export type Event =
   | AuthenticationProviderEvent
   | DocumentEvent
   | PinEvent
+  | CommentEvent
   | StarEvent
   | CollectionEvent
   | FileOperationEvent

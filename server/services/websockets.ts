@@ -276,13 +276,24 @@ async function authenticated(io: IO.Server, socket: SocketWithAuth) {
     const room = `document-${event.documentId}`;
 
     if (event.documentId && socket.rooms.has(room)) {
-      const view = await View.touch(event.documentId, user.id, event.isEditing);
+      await View.touch(event.documentId, user.id, event.isEditing);
 
-      view.user = user;
       io.to(room).emit("user.presence", {
         userId: user.id,
         documentId: event.documentId,
         isEditing: event.isEditing,
+      });
+
+      socket.on("typing", async (event) => {
+        const room = `document-${event.documentId}`;
+
+        if (event.documentId && socket.rooms[room]) {
+          io.to(room).emit("user.typing", {
+            userId: user.id,
+            documentId: event.documentId,
+            commentId: event.commentId,
+          });
+        }
       });
     }
   });

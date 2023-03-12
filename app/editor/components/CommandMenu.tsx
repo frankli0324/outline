@@ -3,7 +3,6 @@ import { findDomRefAtPos, findParentNode } from "prosemirror-utils";
 import { EditorView } from "prosemirror-view";
 import * as React from "react";
 import { Trans } from "react-i18next";
-import { Portal } from "react-portal";
 import { VisuallyHidden } from "reakit/VisuallyHidden";
 import styled from "styled-components";
 import insertFiles from "@shared/editor/commands/insertFiles";
@@ -14,6 +13,7 @@ import { MenuItem } from "@shared/editor/types";
 import { depths } from "@shared/styles";
 import { getEventFiles } from "@shared/utils/files";
 import { AttachmentValidation } from "@shared/validations";
+import { Portal } from "~/components/Portal";
 import Scrollable from "~/components/Scrollable";
 import { Dictionary } from "~/hooks/useDictionary";
 import Input from "./Input";
@@ -62,7 +62,10 @@ type State = {
   selectedIndex: number;
 };
 
-class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
+class CommandMenu<T extends MenuItem> extends React.PureComponent<
+  Props<T>,
+  State
+> {
   menuRef = React.createRef<HTMLDivElement>();
   inputRef = React.createRef<HTMLInputElement>();
 
@@ -78,14 +81,6 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
   componentDidMount() {
     window.addEventListener("mousedown", this.handleMouseDown);
     window.addEventListener("keydown", this.handleKeyDown);
-  }
-
-  shouldComponentUpdate(nextProps: Props<T>, nextState: State) {
-    return (
-      nextProps.search !== this.props.search ||
-      nextProps.isActive !== this.props.isActive ||
-      nextState !== this.state
-    );
   }
 
   componentDidUpdate(prevProps: Props<T>) {
@@ -210,7 +205,7 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
         return;
       }
       default:
-        this.insertBlock(item);
+        this.insertNode(item);
     }
   };
 
@@ -239,7 +234,7 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
         return;
       }
 
-      this.insertBlock({
+      this.insertNode({
         name: "embed",
         attrs: {
           href,
@@ -268,7 +263,7 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
       event.preventDefault();
       event.stopPropagation();
 
-      this.insertBlock({
+      this.insertNode({
         name: "embed",
         attrs: {
           href,
@@ -290,7 +285,7 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
     this.setState({ insertItem: item });
   };
 
-  handleFilePicked = (event: React.ChangeEvent<HTMLInputElement>) => {
+  handleFilesPicked = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = getEventFiles(event);
 
     const {
@@ -331,7 +326,7 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
     this.props.onClearSearch();
   };
 
-  insertBlock(item: MenuItem) {
+  insertNode(item: MenuItem) {
     this.clearSearch();
 
     const command = item.name ? this.props.commands[item.name] : undefined;
@@ -340,6 +335,11 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
       command(item.attrs);
     } else {
       this.props.commands[`create${capitalize(item.name)}`](item.attrs);
+    }
+    if (item.appendSpace) {
+      const { view } = this.props;
+      const { dispatch } = view;
+      dispatch(view.state.tr.insertText(" "));
     }
 
     this.props.onClose();
@@ -390,6 +390,7 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
     const domAtPos = view.domAtPos.bind(view);
 
     const ref = this.menuRef.current;
+    const offsetWidth = ref ? ref.offsetWidth : 0;
     const offsetHeight = ref ? ref.offsetHeight : 0;
     const node = findDomRefAtPos(selection.from, domAtPos);
     const paragraph: any = { node };
@@ -404,24 +405,36 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
 
     const { left } = this.caretPosition;
     const { top, bottom, right } = paragraph.node.getBoundingClientRect();
-    const margin = 24;
+    const margin = 12;
 
-    let leftPos = left + window.scrollX;
-    if (props.rtl && ref) {
-      leftPos = right - ref.scrollWidth;
+    const offsetParent = ref?.offsetParent
+      ? ref.offsetParent.getBoundingClientRect()
+      : ({
+          width: 0,
+          height: 0,
+          top: 0,
+          left: 0,
+        } as DOMRect);
+
+    let leftPos = Math.min(
+      left - offsetParent.left,
+      window.innerWidth - offsetParent.left - offsetWidth - margin
+    );
+    if (props.rtl) {
+      leftPos = right - offsetWidth;
     }
 
     if (startPos.top - offsetHeight > margin) {
       return {
         left: leftPos,
         top: undefined,
-        bottom: window.innerHeight - top - window.scrollY,
+        bottom: offsetParent.bottom - top,
         isAbove: false,
       };
     } else {
       return {
         left: leftPos,
-        top: bottom + window.scrollY,
+        top: bottom - offsetParent.top,
         bottom: undefined,
         isAbove: true,
       };
@@ -459,6 +472,7 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
       );
     }
 
+    const searchInput = search.toLowerCase();
     const filtered = items.filter((item) => {
       if (item.name === "separator") {
         return true;
@@ -483,17 +497,24 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
         return !item.defaultHidden;
       }
 
-      const n = search.toLowerCase();
       if (!filterable) {
         return item;
       }
+
       return (
-        (item.title || "").toLowerCase().includes(n) ||
-        (item.keywords || "").toLowerCase().includes(n)
+        (item.title || "").toLowerCase().includes(searchInput) ||
+        (item.keywords || "").toLowerCase().includes(searchInput)
       );
     });
 
-    return filterExcessSeparators(filtered);
+    return filterExcessSeparators(
+      filtered.sort((item) => {
+        return searchInput &&
+          (item.title || "").toLowerCase().startsWith(searchInput)
+          ? -1
+          : 1;
+      })
+    );
   }
 
   render() {
@@ -572,7 +593,8 @@ class CommandMenu<T extends MenuItem> extends React.Component<Props<T>, State> {
                 <input
                   type="file"
                   ref={this.inputRef}
-                  onChange={this.handleFilePicked}
+                  onChange={this.handleFilesPicked}
+                  multiple
                 />
               </label>
             </VisuallyHidden>
