@@ -695,6 +695,12 @@ describe("#documents.list", () => {
     const { user, collection } = await seed();
     collection.permission = null;
     await collection.save();
+    await CollectionUser.destroy({
+      where: {
+        userId: user.id,
+        collectionId: collection.id,
+      },
+    });
     const res = await server.post("/api/documents.list", {
       body: {
         token: user.getJwtToken(),
@@ -766,12 +772,18 @@ describe("#documents.list", () => {
     const { user, collection } = await seed();
     collection.permission = null;
     await collection.save();
-    await CollectionUser.create({
-      createdById: user.id,
-      collectionId: collection.id,
-      userId: user.id,
-      permission: CollectionPermission.Read,
-    });
+    await CollectionUser.update(
+      {
+        userId: user.id,
+        permission: CollectionPermission.Read,
+      },
+      {
+        where: {
+          createdById: user.id,
+          collectionId: collection.id,
+        },
+      }
+    );
     const res = await server.post("/api/documents.list", {
       body: {
         token: user.getJwtToken(),
@@ -891,6 +903,12 @@ describe("#documents.drafts", () => {
     await document.save();
     collection.permission = null;
     await collection.save();
+    await CollectionUser.destroy({
+      where: {
+        userId: user.id,
+        collectionId: collection.id,
+      },
+    });
     const res = await server.post("/api/documents.drafts", {
       body: {
         token: user.getJwtToken(),
@@ -1555,21 +1573,18 @@ describe("#documents.search", () => {
       },
     });
 
-    return new Promise((resolve) => {
-      // setTimeout is needed here because SearchQuery is saved asynchronously
-      // in order to not slow down the response time.
-      setTimeout(async () => {
-        const searchQuery = await SearchQuery.findAll({
-          where: {
-            query: "my term",
-          },
-        });
-        expect(searchQuery.length).toBe(1);
-        expect(searchQuery[0].results).toBe(0);
-        expect(searchQuery[0].source).toBe("app");
-        resolve(undefined);
-      }, 100);
+    // setTimeout is needed here because SearchQuery is saved asynchronously
+    // in order to not slow down the response time.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const searchQuery = await SearchQuery.findAll({
+      where: {
+        query: "my term",
+      },
     });
+    expect(searchQuery.length).toBe(1);
+    expect(searchQuery[0].results).toBe(0);
+    expect(searchQuery[0].source).toBe("app");
   });
 });
 
@@ -1792,6 +1807,12 @@ describe("#documents.viewed", () => {
     });
     collection.permission = null;
     await collection.save();
+    await CollectionUser.destroy({
+      where: {
+        userId: user.id,
+        collectionId: collection.id,
+      },
+    });
     const res = await server.post("/api/documents.viewed", {
       body: {
         token: user.getJwtToken(),
@@ -2565,12 +2586,18 @@ describe("#documents.update", () => {
     await document.save();
     collection.permission = null;
     await collection.save();
-    await CollectionUser.create({
-      createdById: user.id,
-      collectionId: collection.id,
-      userId: user.id,
-      permission: CollectionPermission.ReadWrite,
-    });
+    await CollectionUser.update(
+      {
+        userId: user.id,
+        permission: CollectionPermission.ReadWrite,
+      },
+      {
+        where: {
+          createdById: user.id,
+          collectionId: collection.id,
+        },
+      }
+    );
     const res = await server.post("/api/documents.update", {
       body: {
         token: user.getJwtToken(),
@@ -2634,18 +2661,24 @@ describe("#documents.update", () => {
   });
 
   it("allows editing by read-write collection user", async () => {
-    const { admin, document, collection } = await seed();
+    const { user, document, collection } = await seed();
     collection.permission = null;
     await collection.save();
-    await CollectionUser.create({
-      collectionId: collection.id,
-      userId: admin.id,
-      createdById: admin.id,
-      permission: CollectionPermission.ReadWrite,
-    });
+    await CollectionUser.update(
+      {
+        createdById: user.id,
+        permission: CollectionPermission.ReadWrite,
+      },
+      {
+        where: {
+          collectionId: collection.id,
+          userId: user.id,
+        },
+      }
+    );
     const res = await server.post("/api/documents.update", {
       body: {
-        token: admin.getJwtToken(),
+        token: user.getJwtToken(),
         id: document.id,
         text: "Changed text",
       },
@@ -2653,19 +2686,25 @@ describe("#documents.update", () => {
     const body = await res.json();
     expect(res.status).toEqual(200);
     expect(body.data.text).toBe("Changed text");
-    expect(body.data.updatedBy.id).toBe(admin.id);
+    expect(body.data.updatedBy.id).toBe(user.id);
   });
 
   it("does not allow editing by read-only collection user", async () => {
     const { user, document, collection } = await seed();
     collection.permission = null;
     await collection.save();
-    await CollectionUser.create({
-      collectionId: collection.id,
-      userId: user.id,
-      createdById: user.id,
-      permission: CollectionPermission.Read,
-    });
+    await CollectionUser.update(
+      {
+        createdById: user.id,
+        permission: CollectionPermission.Read,
+      },
+      {
+        where: {
+          collectionId: collection.id,
+          userId: user.id,
+        },
+      }
+    );
     const res = await server.post("/api/documents.update", {
       body: {
         token: user.getJwtToken(),
@@ -2680,6 +2719,12 @@ describe("#documents.update", () => {
     const { user, document, collection } = await seed();
     collection.permission = CollectionPermission.Read;
     await collection.save();
+    await CollectionUser.destroy({
+      where: {
+        userId: user.id,
+        collectionId: collection.id,
+      },
+    });
     const res = await server.post("/api/documents.update", {
       body: {
         token: user.getJwtToken(),
@@ -2831,10 +2876,6 @@ describe("#documents.update", () => {
       expect(body.data.document.collectionId).toBe(collection.id);
       expect(body.data.document.title).toBe("Updated title");
       expect(body.data.document.text).toBe("Updated text");
-      expect(body.data.collection.icon).toBe(collection.icon);
-      expect(body.data.collection.documents.length).toBe(
-        collection.documentStructure!.length + 1
-      );
     });
   });
 });
@@ -2926,6 +2967,35 @@ describe("#documents.delete", () => {
     expect(deletedDoc).toBeDefined();
     expect(deletedDoc).not.toBeNull();
     expect(deletedDoc?.deletedAt).toBeTruthy();
+  });
+
+  it("should delete a draft under deleted collection", async () => {
+    const user = await buildUser();
+    const collection = await buildCollection({
+      createdById: user.id,
+      teamId: user.teamId,
+      deletedAt: new Date(),
+    });
+    const document = await buildDocument({
+      createdById: user.id,
+      teamId: user.teamId,
+      collectionId: collection.id,
+      publishedAt: null,
+    });
+
+    const res = await server.post("/api/documents.delete", {
+      body: {
+        token: user.getJwtToken(),
+        id: document.id,
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const deletedDoc = await Document.findByPk(document.id, {
+      paranoid: false,
+    });
+    expect(deletedDoc).not.toBe(null);
+    expect(deletedDoc?.deletedAt).not.toBe(null);
   });
 
   it("should allow permanently deleting a document", async () => {
@@ -3082,15 +3152,15 @@ describe("#documents.unpublish", () => {
 });
 
 describe("#documents.users", () => {
-  it("should return document users", async () => {
+  it("should return all users when collection is not private", async () => {
     const user = await buildUser();
     const collection = await buildCollection({
       teamId: user.teamId,
-      createdById: user.id,
+      userId: user.id,
     });
     const document = await buildDocument({
       collectionId: collection.id,
-      createdById: user.id,
+      userId: user.id,
       teamId: user.teamId,
     });
     const [alan, bret, ken] = await Promise.all([
@@ -3108,28 +3178,6 @@ describe("#documents.users", () => {
       }),
     ]);
 
-    // add people to collection
-    await Promise.all([
-      CollectionUser.create({
-        collectionId: collection.id,
-        userId: alan.id,
-        permission: CollectionPermission.Read,
-        createdById: user.id,
-      }),
-      CollectionUser.create({
-        collectionId: collection.id,
-        userId: bret.id,
-        permission: CollectionPermission.Read,
-        createdById: user.id,
-      }),
-      CollectionUser.create({
-        collectionId: collection.id,
-        userId: ken.id,
-        permission: CollectionPermission.Read,
-        createdById: user.id,
-      }),
-    ]);
-
     const res = await server.post("/api/documents.users", {
       body: {
         token: user.getJwtToken(),
@@ -3139,23 +3187,25 @@ describe("#documents.users", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.data.length).toBe(3);
+    expect(body.data.length).toBe(4);
 
     const memberIds = body.data.map((u: User) => u.id);
     expect(memberIds).toContain(alan.id);
     expect(memberIds).toContain(bret.id);
     expect(memberIds).toContain(ken.id);
+    expect(memberIds).toContain(user.id);
   });
 
   it("should return document users with names matching the search query", async () => {
     const user = await buildUser();
     const collection = await buildCollection({
       teamId: user.teamId,
-      createdById: user.id,
+      userId: user.id,
+      permission: null,
     });
     const document = await buildDocument({
       collectionId: collection.id,
-      createdById: user.id,
+      userId: user.id,
       teamId: user.teamId,
     });
     const [alan, bret, ken, jamie] = await Promise.all([
@@ -3248,7 +3298,7 @@ describe("#documents.users", () => {
     expect(body.data[0].name).toBe(alan.name);
 
     expect(anotherRes.status).toBe(200);
-    expect(anotherBody.data.length).toBe(3);
+    expect(anotherBody.data.length).toBe(4);
     const memberIds = anotherBody.data.map((u: User) => u.id);
     const memberNames = anotherBody.data.map((u: User) => u.name);
     expect(memberIds).toContain(bret.id);
@@ -3263,11 +3313,12 @@ describe("#documents.users", () => {
     const user = await buildUser();
     const collection = await buildCollection({
       teamId: user.teamId,
-      createdById: user.id,
+      userId: user.id,
+      permission: null,
     });
     const document = await buildDocument({
       collectionId: collection.id,
-      createdById: user.id,
+      userId: user.id,
       teamId: user.teamId,
     });
     const [alan, bret, ken] = await Promise.all([
@@ -3320,7 +3371,7 @@ describe("#documents.users", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.data.length).toBe(2);
+    expect(body.data.length).toBe(3);
 
     const memberIds = body.data.map((u: User) => u.id);
     expect(memberIds).not.toContain(alan.id);

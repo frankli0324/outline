@@ -46,42 +46,74 @@ export default class Document extends ParanoidModel {
 
   @Field
   @observable
-  collectionId: string;
-
-  @Field
-  @observable
   id: string;
 
+  /**
+   * The id of the collection that this document belongs to, if any.
+   */
+  @Field
+  @observable
+  collectionId?: string | null;
+
+  /**
+   * The text content of the document as Markdown.
+   */
   @observable
   text: string;
 
+  /**
+   * The title of the document.
+   */
   @Field
   @observable
   title: string;
 
+  /**
+   * Whether this is a template.
+   */
   @observable
   template: boolean;
 
+  /**
+   * Whether the document layout is displayed full page width.
+   */
   @Field
   @observable
   fullWidth: boolean;
 
+  /**
+   * Whether team members can see who has viewed this document.
+   */
+  @observable
+  insightsEnabled: boolean;
+
+  /**
+   * A reference to the template that this document was created from.
+   */
   @Field
   @observable
   templateId: string | undefined;
 
+  /**
+   * The id of the parent document that this is a child of, if any.
+   */
   @Field
   @observable
   parentDocumentId: string | undefined;
 
+  @observable
   collaboratorIds: string[];
 
+  @observable
   createdBy: User;
 
+  @observable
   updatedBy: User;
 
+  @observable
   publishedAt: string | undefined;
 
+  @observable
   archivedAt: string;
 
   url: string;
@@ -120,11 +152,6 @@ export default class Document extends ParanoidModel {
   @computed
   get noun(): string {
     return this.template ? "template" : "document";
-  }
-
-  @computed
-  get isOnlyTitle(): boolean {
-    return !this.text.trim();
   }
 
   @computed
@@ -238,23 +265,17 @@ export default class Document extends ParanoidModel {
   }
 
   @action
-  share = async () => {
-    return this.store.rootStore.shares.create({
+  share = async () =>
+    this.store.rootStore.shares.create({
       documentId: this.id,
     });
-  };
 
-  archive = () => {
-    return this.store.archive(this);
-  };
+  archive = () => this.store.archive(this);
 
-  restore = (options?: { revisionId?: string; collectionId?: string }) => {
-    return this.store.restore(this, options);
-  };
+  restore = (options?: { revisionId?: string; collectionId?: string }) =>
+    this.store.restore(this, options);
 
-  unpublish = () => {
-    return this.store.unpublish(this);
-  };
+  unpublish = () => this.store.unpublish(this);
 
   @action
   enableEmbeds = () => {
@@ -267,12 +288,11 @@ export default class Document extends ParanoidModel {
   };
 
   @action
-  pin = (collectionId?: string) => {
-    return this.store.rootStore.pins.create({
+  pin = (collectionId?: string | null) =>
+    this.store.rootStore.pins.create({
       documentId: this.id,
       ...(collectionId ? { collectionId } : {}),
     });
-  };
 
   @action
   unpin = (collectionId?: string) => {
@@ -287,14 +307,10 @@ export default class Document extends ParanoidModel {
   };
 
   @action
-  star = () => {
-    return this.store.star(this);
-  };
+  star = () => this.store.star(this);
 
   @action
-  unstar = () => {
-    return this.store.unstar(this);
-  };
+  unstar = () => this.store.unstar(this);
 
   /**
    * Subscribes the current user to this document.
@@ -302,9 +318,7 @@ export default class Document extends ParanoidModel {
    * @returns A promise that resolves when the subscription is created.
    */
   @action
-  subscribe = () => {
-    return this.store.subscribe(this);
-  };
+  subscribe = () => this.store.subscribe(this);
 
   /**
    * Unsubscribes the current user to this document.
@@ -312,9 +326,7 @@ export default class Document extends ParanoidModel {
    * @returns A promise that resolves when the subscription is destroyed.
    */
   @action
-  unsubscribe = (userId: string) => {
-    return this.store.unsubscribe(userId, this);
-  };
+  unsubscribe = (userId: string) => this.store.unsubscribe(userId, this);
 
   @action
   view = () => {
@@ -336,17 +348,21 @@ export default class Document extends ParanoidModel {
   };
 
   @action
-  templatize = () => {
-    return this.store.templatize(this.id);
-  };
+  templatize = () => this.store.templatize(this.id);
 
   @action
-  save = async (options?: SaveOptions | undefined) => {
-    const params = this.toAPI();
+  save = async (
+    fields?: Partial<Document> | undefined,
+    options?: SaveOptions | undefined
+  ) => {
+    const params = fields ?? this.toAPI();
     this.isSaving = true;
 
     try {
-      const model = await this.store.save({ ...params, id: this.id }, options);
+      const model = await this.store.save(
+        { ...params, ...fields, id: this.id },
+        options
+      );
 
       // if saving is successful set the new values on the model itself
       set(this, { ...params, ...model });
@@ -359,13 +375,10 @@ export default class Document extends ParanoidModel {
     }
   };
 
-  move = (collectionId: string, parentDocumentId?: string | undefined) => {
-    return this.store.move(this.id, collectionId, parentDocumentId);
-  };
+  move = (collectionId: string, parentDocumentId?: string | undefined) =>
+    this.store.move(this.id, collectionId, parentDocumentId);
 
-  duplicate = () => {
-    return this.store.duplicate(this);
-  };
+  duplicate = () => this.store.duplicate(this);
 
   getSummary = (paragraphs = 4) => {
     const result = this.text.trim().split("\n").slice(0, paragraphs).join("\n");
@@ -405,8 +418,8 @@ export default class Document extends ParanoidModel {
     };
   }
 
-  download = (contentType: ExportContentType) => {
-    return client.post(
+  download = (contentType: ExportContentType) =>
+    client.post(
       `/documents.export`,
       {
         id: this.id,
@@ -418,5 +431,4 @@ export default class Document extends ParanoidModel {
         },
       }
     );
-  };
 }

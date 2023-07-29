@@ -143,11 +143,10 @@ export default class UsersStore extends BaseStore<User> {
   };
 
   @action
-  resendInvite = async (user: User) => {
-    return client.post(`/users.resendInvite`, {
+  resendInvite = async (user: User) =>
+    client.post(`/users.resendInvite`, {
       id: user.id,
     });
-  };
 
   @action
   fetchCounts = async (teamId: string): Promise<any> => {
@@ -180,7 +179,7 @@ export default class UsersStore extends BaseStore<User> {
 
   @action
   async delete(user: User, options: Record<string, any> = {}) {
-    super.delete(user, options);
+    await super.delete(user, options);
 
     if (!user.isSuspended && user.lastActiveAt) {
       this.counts.active -= 1;

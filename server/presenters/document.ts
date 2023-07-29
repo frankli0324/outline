@@ -7,26 +7,6 @@ type Options = {
   isPublic?: boolean;
 };
 
-// replaces attachments.redirect urls with signed/authenticated url equivalents
-async function replaceImageAttachments(text: string) {
-  const attachmentIds = parseAttachmentIds(text);
-  await Promise.all(
-    attachmentIds.map(async (id) => {
-      const attachment = await Attachment.findByPk(id);
-
-      if (attachment) {
-        const signedUrl = await getSignedUrl(attachment.key, 3600);
-        text = text.replace(
-          new RegExp(escapeRegExp(attachment.redirectUrl), "g"),
-          signedUrl
-        );
-      }
-    })
-  );
-
-  return text;
-}
-
 async function presentDocument(
   document: Document,
   options: Options | null | undefined = {}
@@ -61,6 +41,7 @@ async function presentDocument(
     templateId: document.templateId,
     collaboratorIds: [],
     revision: document.revisionCount,
+    insightsEnabled: document.insightsEnabled,
     fullWidth: document.fullWidth,
     collectionId: undefined,
     parentDocumentId: undefined,

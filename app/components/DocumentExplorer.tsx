@@ -45,10 +45,8 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
   const [selectedNode, selectNode] = React.useState<NavigationNode | null>(
     null
   );
-  const [initialScrollOffset, setInitialScrollOffset] = React.useState<number>(
-    0
-  );
-  const [nodes, setNodes] = React.useState<NavigationNode[]>([]);
+  const [initialScrollOffset, setInitialScrollOffset] =
+    React.useState<number>(0);
   const [activeNode, setActiveNode] = React.useState<number>(0);
   const [expandedNodes, setExpandedNodes] = React.useState<string[]>([]);
   const [itemRefs, setItemRefs] = React.useState<
@@ -63,11 +61,13 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
   const VERTICAL_PADDING = 6;
   const HORIZONTAL_PADDING = 24;
 
-  const searchIndex = React.useMemo(() => {
-    return new FuzzySearch(items, ["title"], {
-      caseSensitive: false,
-    });
-  }, [items]);
+  const searchIndex = React.useMemo(
+    () =>
+      new FuzzySearch(items, ["title"], {
+        caseSensitive: false,
+      }),
+    [items]
+  );
 
   React.useEffect(() => {
     if (searchTerm) {
@@ -76,19 +76,6 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
     }
     setActiveNode(0);
   }, [searchTerm]);
-
-  React.useEffect(() => {
-    let results;
-
-    if (searchTerm) {
-      results = searchIndex.search(searchTerm);
-    } else {
-      results = items.filter((item) => item.type === "collection");
-    }
-
-    setInitialScrollOffset(0);
-    setNodes(results);
-  }, [searchTerm, items, searchIndex]);
 
   React.useEffect(() => {
     setItemRefs((itemRefs) =>
@@ -102,6 +89,22 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
   React.useEffect(() => {
     onSelect(selectedNode);
   }, [selectedNode, onSelect]);
+
+  function getNodes() {
+    function includeDescendants(item: NavigationNode): NavigationNode[] {
+      return expandedNodes.includes(item.id)
+        ? [item, ...descendants(item, 1).flatMap(includeDescendants)]
+        : [item];
+    }
+
+    return searchTerm
+      ? searchIndex.search(searchTerm)
+      : items
+          .filter((item) => item.type === "collection")
+          .flatMap(includeDescendants);
+  }
+
+  const nodes = getNodes();
 
   const scrollNodeIntoView = React.useCallback(
     (node: number) => {
@@ -119,9 +122,7 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
     setSearchTerm(ev.target.value);
   };
 
-  const isExpanded = (node: number) => {
-    return includes(expandedNodes, nodes[node].id);
-  };
+  const isExpanded = (node: number) => includes(expandedNodes, nodes[node].id);
 
   const calculateInitialScrollOffset = (itemCount: number) => {
     if (listRef.current) {
@@ -130,7 +131,7 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
         scrollOffset: number;
       };
       const itemsHeight = itemCount * itemSize;
-      return itemsHeight < height ? 0 : scrollOffset;
+      return itemsHeight < Number(height) ? 0 : scrollOffset;
     }
     return 0;
   };
@@ -145,7 +146,6 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
     const newNodes = filter(nodes, (node) => !includes(descendantIds, node.id));
     const scrollOffset = calculateInitialScrollOffset(newNodes.length);
     setInitialScrollOffset(scrollOffset);
-    setNodes(newNodes);
   };
 
   const expand = (node: number) => {
@@ -156,8 +156,17 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
     newNodes.splice(node + 1, 0, ...descendants(nodes[node], 1));
     const scrollOffset = calculateInitialScrollOffset(newNodes.length);
     setInitialScrollOffset(scrollOffset);
-    setNodes(newNodes);
   };
+
+  React.useEffect(() => {
+    collections.orderedData
+      .filter(
+        (collection) => expandedNodes.includes(collection.id) || searchTerm
+      )
+      .forEach((collection) => {
+        void collection.fetchDocuments();
+      });
+  }, [collections, expandedNodes, searchTerm]);
 
   const isSelected = (node: number) => {
     if (!selectedNode) {
@@ -169,9 +178,8 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
     return selectedNodeId === nodeId;
   };
 
-  const hasChildren = (node: number) => {
-    return nodes[node].children.length > 0;
-  };
+  const hasChildren = (node: number) =>
+    nodes[node].children.length > 0 || nodes[node].type === "collection";
 
   const toggleCollapse = (node: number) => {
     if (!hasChildren(node)) {
@@ -221,7 +229,7 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
       } else if (doc?.isStarred) {
         icon = <StarredIcon color={theme.yellow} />;
       } else {
-        icon = <DocumentIcon />;
+        icon = <DocumentIcon color={theme.textSecondary} />;
       }
 
       path = ancestors(node)
@@ -275,24 +283,22 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
     inputSearchRef.current?.focus();
   };
 
-  const next = () => {
-    return Math.min(activeNode + 1, nodes.length - 1);
-  };
+  const next = () => Math.min(activeNode + 1, nodes.length - 1);
 
-  const prev = () => {
-    return Math.max(activeNode - 1, 0);
-  };
+  const prev = () => Math.max(activeNode - 1, 0);
 
   const handleKeyDown = (ev: React.KeyboardEvent<HTMLDivElement>) => {
     switch (ev.key) {
       case "ArrowDown": {
         ev.preventDefault();
+        ev.stopPropagation();
         setActiveNode(next());
         scrollNodeIntoView(next());
         break;
       }
       case "ArrowUp": {
         ev.preventDefault();
+        ev.stopPropagation();
         if (activeNode === 0) {
           focusSearchInput();
         } else {
@@ -329,16 +335,21 @@ function DocumentExplorer({ onSubmit, onSelect, items }: Props) {
   const innerElementType = React.forwardRef<
     HTMLDivElement,
     React.HTMLAttributes<HTMLDivElement>
-  >(({ style, ...rest }, ref) => (
-    <div
-      ref={ref}
-      style={{
-        ...style,
-        height: `${parseFloat(style?.height + "") + VERTICAL_PADDING * 2}px`,
-      }}
-      {...rest}
-    />
-  ));
+  >(function innerElementType(
+    { style, ...rest }: React.HTMLAttributes<HTMLDivElement>,
+    ref
+  ) {
+    return (
+      <div
+        ref={ref}
+        style={{
+          ...style,
+          height: `${parseFloat(style?.height + "") + VERTICAL_PADDING * 2}px`,
+        }}
+        {...rest}
+      />
+    );
+  });
 
   return (
     <Container tabIndex={-1} onKeyDown={handleKeyDown}>

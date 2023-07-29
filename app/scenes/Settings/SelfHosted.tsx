@@ -41,7 +41,7 @@ function SelfHosted() {
   });
 
   React.useEffect(() => {
-    integrations.fetchPage({
+    void integrations.fetchPage({
       type: IntegrationType.Embed,
     });
   }, [integrations]);
@@ -79,10 +79,7 @@ function SelfHosted() {
   );
 
   return (
-    <Scene
-      title={t("Self Hosted")}
-      icon={<BuildingBlocksIcon color="currentColor" />}
-    >
+    <Scene title={t("Self Hosted")} icon={<BuildingBlocksIcon />}>
       <Heading>{t("Self Hosted")}</Heading>
 
       <form onSubmit={formHandleSubmit(handleSubmit)}>

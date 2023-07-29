@@ -8,7 +8,9 @@ const DocumentsSortParamsSchema = z.object({
   /** Specifies the attributes by which documents will be sorted in the list */
   sort: z
     .string()
-    .refine((val) => ["createdAt", "updatedAt", "index", "title"].includes(val))
+    .refine((val) =>
+      ["createdAt", "updatedAt", "publishedAt", "index", "title"].includes(val)
+    )
     .default("updatedAt"),
 
   /** Specifies the sort order with respect to sort field */
@@ -187,6 +189,9 @@ export const DocumentsUpdateSchema = BaseSchema.extend({
     /** Boolean to denote if the doc should occupy full width */
     fullWidth: z.boolean().optional(),
 
+    /** Boolean to denote if insights should be visible on the doc */
+    insightsEnabled: z.boolean().optional(),
+
     /** Boolean to denote if the doc should be published */
     publish: z.boolean().optional(),
 
@@ -201,6 +206,9 @@ export const DocumentsUpdateSchema = BaseSchema.extend({
 
     /** Version of the API to be used */
     apiVersion: z.number().optional(),
+
+    /** Whether the editing session is complete */
+    done: z.boolean().optional(),
   }),
 }).refine((req) => !(req.body.append && !req.body.text), {
   message: "text is required while appending",
@@ -283,6 +291,9 @@ export const DocumentsCreateSchema = BaseSchema.extend({
 
     /** Create doc with this template */
     templateId: z.string().uuid().optional(),
+
+    /** Boolean to denote if the doc should occupy full width */
+    fullWidth: z.boolean().optional(),
 
     /** Whether to create a template doc */
     template: z.boolean().optional(),

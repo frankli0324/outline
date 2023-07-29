@@ -9,10 +9,6 @@ declare module "styled-components" {
     text: string;
     cursor: string;
     divider: string;
-    toolbarBackground: string;
-    toolbarHoverBackground: string;
-    toolbarInput: string;
-    toolbarItem: string;
     tableDivider: string;
     tableSelected: string;
     tableSelectedBackground: string;
@@ -38,6 +34,7 @@ declare module "styled-components" {
     codeProperty: string;
     codeTag: string;
     codeString: string;
+    codeClassName: string;
     codeSelector: string;
     codeAttr: string;
     codeEntity: string;
@@ -53,6 +50,8 @@ declare module "styled-components" {
     noticeTipText: string;
     noticeWarningBackground: string;
     noticeWarningText: string;
+    noticeSuccessBackground: string;
+    noticeSuccessText: string;
   }
 
   interface Colors {
@@ -107,9 +106,6 @@ declare module "styled-components" {
   }
 
   interface Spacing {
-    padding: string;
-    vpadding: string;
-    hpadding: string;
     sidebarWidth: number;
     sidebarRightWidth: number;
     sidebarCollapsedWidth: number;
@@ -138,7 +134,6 @@ declare module "styled-components" {
     textDiffDeletedBackground: string;
     placeholder: string;
     commentBackground: string;
-    commentActiveBackground: string;
     sidebarBackground: string;
     sidebarActiveBackground: string;
     sidebarControlHoverBackground: string;

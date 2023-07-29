@@ -40,15 +40,14 @@ export const fadeOnDesktopBackgrounded = () => {
 };
 
 /**
- * Mixin to hide scrollbars.
+ * Truncate multiline text.
  *
  * @returns string of CSS
  */
-export const hideScrollbars = () => `
-  -ms-overflow-style: none;
-  overflow: -moz-scrollbars-none;
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
+export const truncateMultiline = (lines: number) => `
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: ${lines};
+  overflow: hidden;
+  overflow-wrap: anywhere;
 `;

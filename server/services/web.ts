@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
+import crypto from "crypto";
+import { Server } from "https";
 import Koa from "koa";
 import {
   contentSecurityPolicy,
@@ -10,8 +12,11 @@ import enforceHttps, {
   httpsResolver,
   xForwardedProtoResolver,
 } from "koa-sslify";
+import { Second } from "@shared/utils/time";
 import env from "@server/env";
 import Logger from "@server/logging/Logger";
+import Metrics from "@server/logging/Metrics";
+import ShutdownHelper, { ShutdownOrder } from "@server/utils/ShutdownHelper";
 import { initI18n } from "@server/utils/i18n";
 import routes from "../routes";
 import api from "../routes/api";
@@ -23,8 +28,6 @@ const isProduction = env.ENVIRONMENT === "production";
 const defaultSrc = ["'self'"];
 const scriptSrc = [
   "'self'",
-  "'unsafe-inline'",
-  "'unsafe-eval'",
   "gist.github.com",
   "www.googletagmanager.com",
   "cdn.zapier.com",
@@ -53,8 +56,8 @@ if (env.CDN_URL) {
   defaultSrc.push(env.CDN_URL);
 }
 
-export default function init(app: Koa = new Koa()): Koa {
-  initI18n();
+export default function init(app: Koa = new Koa(), server?: Server) {
+  void initI18n();
 
   if (isProduction) {
     // Force redirect to HTTPS protocol unless explicitly disabled
@@ -79,22 +82,43 @@ export default function init(app: Koa = new Koa()): Koa {
 
   app.use(mount("/auth", auth));
   app.use(mount("/api", api));
+
+  // Monitor server connections
+  if (server) {
+    setInterval(() => {
+      server.getConnections((err, count) => {
+        if (err) {
+          return;
+        }
+        Metrics.gaugePerInstance("connections.count", count);
+      });
+    }, 5 * Second);
+  }
+
+  ShutdownHelper.add("connections", ShutdownOrder.normal, async () => {
+    Metrics.gaugePerInstance("connections.count", 0);
+  });
+
   // Sets common security headers by default, such as no-sniff, hsts, hide powered
   // by etc, these are applied after auth and api so they are only returned on
   // standard non-XHR accessed routes
-  app.use(
-    contentSecurityPolicy({
+  app.use((ctx, next) => {
+    ctx.state.cspNonce = crypto.randomBytes(16).toString("hex");
+
+    return contentSecurityPolicy({
       directives: {
         defaultSrc,
-        scriptSrc,
         styleSrc,
+        scriptSrc: [...scriptSrc, `'nonce-${ctx.state.cspNonce}'`],
         imgSrc: ["*", "data:", "blob:"],
         frameSrc: ["*", "data:"],
-        connectSrc: ["*"], // Do not use connect-src: because self + websockets does not work in
+        // Do not use connect-src: because self + websockets does not work in
         // Safari, ref: https://bugs.webkit.org/show_bug.cgi?id=201591
+        connectSrc: ["*"],
       },
-    })
-  );
+    })(ctx, next);
+  });
+
   // Allow DNS prefetching for performance, we do not care about leaking requests
   // to our own CDN's
   app.use(
@@ -107,6 +131,8 @@ export default function init(app: Koa = new Koa()): Koa {
       policy: "no-referrer",
     })
   );
+
   app.use(mount(routes));
+
   return app;
 }

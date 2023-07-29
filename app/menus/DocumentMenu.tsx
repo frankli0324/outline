@@ -7,6 +7,7 @@ import { useMenuState, MenuButton, MenuButtonHTMLProps } from "reakit/Menu";
 import { VisuallyHidden } from "reakit/VisuallyHidden";
 import styled from "styled-components";
 import breakpoint from "styled-components-breakpoint";
+import { s, ellipsis } from "@shared/styles";
 import { getEventFiles } from "@shared/utils/files";
 import Document from "~/models/Document";
 import ContextMenu from "~/components/ContextMenu";
@@ -46,7 +47,7 @@ import useRequest from "~/hooks/useRequest";
 import useStores from "~/hooks/useStores";
 import useToasts from "~/hooks/useToasts";
 import { MenuItem } from "~/types";
-import { editDocumentUrl, newDocumentPath } from "~/utils/routeHelpers";
+import { documentEditPath, newDocumentPath } from "~/utils/routeHelpers";
 
 type Props = {
   document: Document;
@@ -99,7 +100,7 @@ function DocumentMenu({
 
   const handleOpen = React.useCallback(async () => {
     if (!data && !loading) {
-      request();
+      await request();
     }
 
     if (onOpen) {
@@ -122,14 +123,16 @@ function DocumentMenu({
     [showToast, t, document]
   );
 
-  const collection = collections.get(document.collectionId);
+  const collection = document.collectionId
+    ? collections.get(document.collectionId)
+    : undefined;
   const can = usePolicy(document);
   const restoreItems = React.useMemo(
     () => [
       ...collections.orderedData.reduce<MenuItem[]>((filtered, collection) => {
         const can = policies.abilities(collection.id);
 
-        if (can.update) {
+        if (can.createDocument) {
           filtered.push({
             type: "button",
             onClick: (ev) =>
@@ -259,7 +262,7 @@ function DocumentMenu({
             {
               type: "route",
               title: t("Edit"),
-              to: editDocumentUrl(document),
+              to: documentEditPath(document),
               visible: !!can.update && !team.seamlessEditing,
               icon: <EditIcon />,
             },
@@ -322,7 +325,7 @@ function DocumentMenu({
                   checked={document.fullWidth}
                   onChange={(ev) => {
                     document.fullWidth = ev.currentTarget.checked;
-                    document.save();
+                    void document.save();
                   }}
                 />
               </Style>
@@ -337,7 +340,7 @@ function DocumentMenu({
 const ToggleMenuItem = styled(Switch)`
   * {
     font-weight: normal;
-    color: ${(props) => props.theme.textSecondary};
+    color: ${s("textSecondary")};
   }
 `;
 
@@ -351,9 +354,7 @@ const Style = styled.div`
 `;
 
 const CollectionName = styled.div`
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  ${ellipsis()}
 `;
 
 export default observer(DocumentMenu);

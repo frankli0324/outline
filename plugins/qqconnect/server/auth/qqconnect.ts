@@ -11,7 +11,6 @@ import { User } from "@server/models";
 import { AuthenticationResult } from "@server/types";
 import {
   StateStore,
-  request,
   getTeamFromContext,
   getClientFromContext,
 } from "@server/utils/passport";
@@ -91,7 +90,6 @@ if (QQ_CLIENT_ID && QQ_CLIENT_SECRET) {
               body: `access_token=${accessToken}&openid=${openid}&oauth_consumer_key=${QQ_CLIENT_ID}`,
             })
           ).json();
-          console.log(userInfo);
           const hash = crypto
             .createHash("md5")
             .update(userInfo.nickname)
@@ -102,7 +100,7 @@ if (QQ_CLIENT_ID && QQ_CLIENT_SECRET) {
             team: {
               teamId: team?.id,
               name: "MBTI Mafia",
-              subdomain: QQ_SUBDOMAIN,
+              subdomain: QQ_SUBDOMAIN || "qq.com",
             },
             user: {
               name: userInfo.nickname,

@@ -13,7 +13,6 @@ import {
   getCurrentTimeAsString,
   unicodeCLDRtoBCP47,
 } from "@shared/utils/date";
-import unescape from "@shared/utils/unescape";
 import { parser, schema } from "@server/editor";
 import { trace } from "@server/logging/tracing";
 import type Document from "@server/models/Document";
@@ -54,7 +53,7 @@ export default class DocumentHelper {
       Y.applyUpdate(ydoc, document.state);
       return Node.fromJSON(schema, yDocToProsemirrorJSON(ydoc, "default"));
     }
-    return parser.parse(document.text);
+    return parser.parse(document.text) || Node.fromJSON(schema, {});
   }
 
   /**
@@ -83,7 +82,7 @@ export default class DocumentHelper {
    * @returns The document title and content as a Markdown string
    */
   static toMarkdown(document: Document | Revision) {
-    const text = unescape(document.text);
+    const text = document.text.replace(/\n\\\n/g, "\n\n");
 
     if (document.version) {
       return `# ${document.title}\n\n${text}`;
@@ -192,9 +191,15 @@ export default class DocumentHelper {
     const dom = new JSDOM(html);
     const doc = dom.window.document;
 
-    const containsDiffElement = (node: Element | null) => {
-      return node && node.innerHTML.includes("data-operation-index");
-    };
+    const containsDiffElement = (node: Element | null) =>
+      node && node.innerHTML.includes("data-operation-index");
+
+    // The diffing lib isn't able to catch all changes currently, e.g. changing
+    // the type of a mark will result in an empty diff.
+    // see: https://github.com/tnwinc/htmldiff.js/issues/10
+    if (!containsDiffElement(doc.querySelector("#content"))) {
+      return;
+    }
 
     // We use querySelectorAll to get a static NodeList as we'll be modifying
     // it as we iterate, rather than getting content.childNodes.
@@ -299,7 +304,7 @@ export default class DocumentHelper {
    *
    * @param text The text either html or markdown which contains urls to be converted
    * @param teamId The team context
-   * @param expiresIn The time that signed urls should expire in (ms)
+   * @param expiresIn The time that signed urls should expire (in seconds)
    * @returns The replaced text
    */
   static async attachmentsToSignedUrls(

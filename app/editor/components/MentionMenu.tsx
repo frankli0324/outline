@@ -8,10 +8,10 @@ import { MentionType } from "@shared/types";
 import parseDocumentSlug from "@shared/utils/parseDocumentSlug";
 import User from "~/models/User";
 import Avatar from "~/components/Avatar";
+import { AvatarSize } from "~/components/Avatar/Avatar";
 import Flex from "~/components/Flex";
 import useRequest from "~/hooks/useRequest";
 import useStores from "~/hooks/useStores";
-import { useEditor } from "./EditorContext";
 import MentionMenuItem from "./MentionMenuItem";
 import SuggestionsMenu, {
   Props as SuggestionsMenuProps,
@@ -32,17 +32,17 @@ interface MentionItem extends MenuItem {
 
 type Props = Omit<
   SuggestionsMenuProps<MentionItem>,
-  "renderMenuItem" | "items" | "onLinkToolbarOpen" | "embeds" | "onClearSearch"
+  "renderMenuItem" | "items" | "onLinkToolbarOpen" | "embeds" | "trigger"
 >;
 
 function MentionMenu({ search, isActive, ...rest }: Props) {
+  const [loaded, setLoaded] = React.useState(false);
   const [items, setItems] = React.useState<MentionItem[]>([]);
   const { t } = useTranslation();
   const { users, auth } = useStores();
   const location = useLocation();
   const documentId = parseDocumentSlug(location.pathname);
-  const { view } = useEditor();
-  const { data, request } = useRequest(
+  const { data, loading, request } = useRequest(
     React.useCallback(
       () =>
         documentId
@@ -54,49 +54,43 @@ function MentionMenu({ search, isActive, ...rest }: Props) {
 
   React.useEffect(() => {
     if (isActive) {
-      request();
+      void request();
     }
   }, [request, isActive]);
 
   React.useEffect(() => {
-    if (data) {
-      setItems(
-        data.map((user) => ({
-          name: "mention",
-          user,
-          title: user.name,
-          appendSpace: true,
-          attrs: {
-            id: v4(),
-            type: MentionType.User,
-            modelId: user.id,
-            actorId: auth.user?.id,
-            label: user.name,
-          },
-        }))
-      );
+    if (data && !loading) {
+      const items = data.map((user) => ({
+        name: "mention",
+        user,
+        title: user.name,
+        appendSpace: true,
+        attrs: {
+          id: v4(),
+          type: MentionType.User,
+          modelId: user.id,
+          actorId: auth.user?.id,
+          label: user.name,
+        },
+      }));
+
+      setItems(items);
+      setLoaded(true);
     }
-  }, [auth.user?.id, data]);
+  }, [auth.user?.id, loading, data]);
 
-  const clearSearch = () => {
-    const { state, dispatch } = view;
-
-    // clear search input
-    dispatch(
-      state.tr.insertText(
-        "",
-        state.selection.$from.pos - (search ?? "").length - 1,
-        state.selection.to
-      )
-    );
-  };
+  // Prevent showing the menu until we have data otherwise it will be positioned
+  // incorrectly due to the height being unknown.
+  if (!loaded) {
+    return null;
+  }
 
   return (
     <SuggestionsMenu
       {...rest}
       isActive={isActive}
       filterable={false}
-      onClearSearch={clearSearch}
+      trigger="@"
       search={search}
       renderMenuItem={(item, _index, options) => (
         <MentionMenuItem
@@ -114,7 +108,7 @@ function MentionMenu({ search, isActive, ...rest }: Props) {
                 model={item.user}
                 showBorder={false}
                 alt={t("Profile picture")}
-                size={16}
+                size={AvatarSize.Small}
               />
             </Flex>
           }

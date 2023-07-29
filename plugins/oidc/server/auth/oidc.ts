@@ -33,6 +33,20 @@ Strategy.prototype.userProfile = async function (accessToken, done) {
   }
 };
 
+const authorizationParams = Strategy.prototype.authorizationParams;
+Strategy.prototype.authorizationParams = function (options) {
+  return {
+    ...(options.originalQuery || {}),
+    ...(authorizationParams.bind(this)(options) || {}),
+  };
+};
+
+const authenticate = Strategy.prototype.authenticate;
+Strategy.prototype.authenticate = function (req, options) {
+  options.originalQuery = req.query;
+  authenticate.bind(this)(req, options);
+};
+
 if (
   env.OIDC_CLIENT_ID &&
   env.OIDC_CLIENT_SECRET &&
@@ -80,11 +94,6 @@ if (
               `An email field was not returned in the profile parameter, but is required.`
             );
           }
-          if (!profile.name) {
-            throw AuthenticationError(
-              `A name field was not returned in the profile parameter, but is required.`
-            );
-          }
           const team = await getTeamFromContext(ctx);
           const client = getClientFromContext(ctx);
 
@@ -101,6 +110,14 @@ if (
           // Claim name can be overriden using an env variable.
           // Default is 'preferred_username' as per OIDC spec.
           const username = get(profile, env.OIDC_USERNAME_CLAIM);
+          const name = profile.name || username || profile.username;
+          const providerId = profile.sub ? profile.sub : profile.id;
+
+          if (!name) {
+            throw AuthenticationError(
+              `Neither a name or username was returned in the profile parameter, but at least one is required.`
+            );
+          }
 
           const result = await accountProvisioner({
             ip: ctx.ip,
@@ -112,7 +129,7 @@ if (
               subdomain,
             },
             user: {
-              name: profile.name || username || profile.username,
+              name,
               email: profile.email,
               avatarUrl: profile.picture,
             },
@@ -121,7 +138,7 @@ if (
               providerId: domain,
             },
             authentication: {
-              providerId: profile.sub,
+              providerId,
               accessToken,
               refreshToken,
               expiresIn: params.expires_in,

@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { addMinutes, subMinutes } from "date-fns";
+import { addHours, addMinutes, subMinutes } from "date-fns";
 import JWT from "jsonwebtoken";
 import { Context } from "koa";
 import { Transaction, QueryTypes, SaveOptions, Op } from "sequelize";
@@ -22,6 +22,7 @@ import {
   AllowNull,
   AfterUpdate,
 } from "sequelize-typescript";
+import { UserPreferenceDefaults } from "@shared/constants";
 import { languages } from "@shared/i18n";
 import type { NotificationSettings } from "@shared/types";
 import {
@@ -286,13 +287,8 @@ class User extends ParanoidModel {
    * @param type The type of notification event
    * @returns The current preference
    */
-  public subscribedToEventType = (type: NotificationEventType) => {
-    return (
-      this.notificationSettings[type] ??
-      NotificationEventDefaults[type] ??
-      false
-    );
-  };
+  public subscribedToEventType = (type: NotificationEventType) =>
+    this.notificationSettings[type] ?? NotificationEventDefaults[type] ?? false;
 
   /**
    * User flags are for storing information on a user record that is not visible
@@ -321,9 +317,7 @@ class User extends ParanoidModel {
    * @param flag The flag to retrieve
    * @returns The flag value
    */
-  public getFlag = (flag: UserFlag) => {
-    return this.flags?.[flag] ?? 0;
-  };
+  public getFlag = (flag: UserFlag) => this.flags?.[flag] ?? 0;
 
   /**
    * User flags are for storing information on a user record that is not visible
@@ -361,15 +355,15 @@ class User extends ParanoidModel {
   };
 
   /**
-   * Returns the passed preference value
+   * Returns the value of the givem preference
    *
    * @param preference The user preference to retrieve
-   * @param fallback An optional fallback value, defaults to false.
-   * @returns The preference value if set, else undefined
+   * @returns The preference value if set, else the default value.
    */
-  public getPreference = (preference: UserPreference, fallback = false) => {
-    return this.preferences?.[preference] ?? fallback;
-  };
+  public getPreference = (preference: UserPreference) =>
+    this.preferences?.[preference] ??
+    UserPreferenceDefaults[preference] ??
+    false;
 
   collectionIds = async (options = {}) => {
     const collectionStubs = await Collection.scope({
@@ -386,8 +380,9 @@ class User extends ParanoidModel {
     return collectionStubs
       .filter(
         (c) =>
-          c.permission === CollectionPermission.Read ||
-          c.permission === CollectionPermission.ReadWrite ||
+          Object.values(CollectionPermission).includes(
+            c.permission as CollectionPermission
+          ) ||
           c.memberships.length > 0 ||
           c.collectionGroupMemberships.length > 0
       )
@@ -448,8 +443,8 @@ class User extends ParanoidModel {
    * @param expiresAt The time the token will expire at
    * @returns The session token
    */
-  getJwtToken = (expiresAt?: Date) => {
-    return JWT.sign(
+  getJwtToken = (expiresAt?: Date) =>
+    JWT.sign(
       {
         id: this.id,
         expiresAt: expiresAt ? expiresAt.toISOString() : undefined,
@@ -457,7 +452,22 @@ class User extends ParanoidModel {
       },
       this.jwtSecret
     );
-  };
+
+  /**
+   * Returns a session token that is used to make collaboration requests and is
+   * stored in the client memory.
+   *
+   * @returns The session token
+   */
+  getCollaborationToken = () =>
+    JWT.sign(
+      {
+        id: this.id,
+        expiresAt: addHours(new Date(), 24).toISOString(),
+        type: "collaboration",
+      },
+      this.jwtSecret
+    );
 
   /**
    * Returns a temporary token that is only used for transferring a session
@@ -466,8 +476,8 @@ class User extends ParanoidModel {
    *
    * @returns The transfer token
    */
-  getTransferToken = () => {
-    return JWT.sign(
+  getTransferToken = () =>
+    JWT.sign(
       {
         id: this.id,
         createdAt: new Date().toISOString(),
@@ -476,7 +486,6 @@ class User extends ParanoidModel {
       },
       this.jwtSecret
     );
-  };
 
   /**
    * Returns a temporary token that is only used for logging in from an email
@@ -484,8 +493,8 @@ class User extends ParanoidModel {
    *
    * @returns The email signin token
    */
-  getEmailSigninToken = () => {
-    return JWT.sign(
+  getEmailSigninToken = () =>
+    JWT.sign(
       {
         id: this.id,
         createdAt: new Date().toISOString(),
@@ -493,15 +502,14 @@ class User extends ParanoidModel {
       },
       this.jwtSecret
     );
-  };
 
   /**
    * Returns a list of teams that have a user matching this user's email.
    *
    * @returns A promise resolving to a list of teams
    */
-  availableTeams = async () => {
-    return Team.findAll({
+  availableTeams = async () =>
+    Team.findAll({
       include: [
         {
           model: this.constructor as typeof User,
@@ -510,7 +518,6 @@ class User extends ParanoidModel {
         },
       ],
     });
-  };
 
   demote = async (to: UserRole, options?: SaveOptions<User>) => {
     const res = await (this.constructor as typeof User).findAndCountAll({
@@ -560,12 +567,11 @@ class User extends ParanoidModel {
     }
   };
 
-  promote = () => {
-    return this.update({
+  promote = () =>
+    this.update({
       isAdmin: true,
       isViewer: false,
     });
-  };
 
   // hooks
 

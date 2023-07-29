@@ -90,13 +90,9 @@ function StarredLink({ star }: Props) {
   }, [star.collectionId, ui.activeCollectionId, locationStateStarred]);
 
   useEffect(() => {
-    async function load() {
-      if (documentId) {
-        await documents.fetch(documentId);
-      }
+    if (documentId) {
+      void documents.fetch(documentId);
     }
-
-    load();
   }, [documentId, documents]);
 
   const handleDisclosureClick = React.useCallback(
@@ -134,7 +130,7 @@ function StarredLink({ star }: Props) {
     drop: (item: { star: Star }) => {
       const next = star?.next();
 
-      item.star.save({
+      void item.star.save({
         index: fractionalIndex(star?.index || null, next?.index || null),
       });
     },
@@ -152,7 +148,9 @@ function StarredLink({ star }: Props) {
       return null;
     }
 
-    const collection = collections.get(document.collectionId);
+    const collection = document.collectionId
+      ? collections.get(document.collectionId)
+      : undefined;
     const childDocuments = collection
       ? collection.getDocumentChildren(documentId)
       : [];

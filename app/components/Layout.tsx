@@ -1,8 +1,9 @@
 import { observer } from "mobx-react";
 import * as React from "react";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import styled, { DefaultTheme } from "styled-components";
 import breakpoint from "styled-components-breakpoint";
+import { s } from "@shared/styles";
 import Flex from "~/components/Flex";
 import { LoadingIndicatorBar } from "~/components/LoadingIndicator";
 import SkipNavContent from "~/components/SkipNavContent";
@@ -15,6 +16,7 @@ import useStores from "~/hooks/useStores";
 import { isModKey } from "~/utils/keyboard";
 
 type Props = {
+  children?: React.ReactNode;
   title?: string;
   sidebar?: React.ReactNode;
   sidebarRight?: React.ReactNode;
@@ -25,7 +27,7 @@ const Layout: React.FC<Props> = ({
   children,
   sidebar,
   sidebarRight,
-}) => {
+}: Props) => {
   const { ui } = useStores();
   const sidebarCollapsed = !sidebar || ui.sidebarIsClosed;
 
@@ -76,8 +78,8 @@ const Layout: React.FC<Props> = ({
 };
 
 const Container = styled(Flex)`
-  background: ${(props) => props.theme.background};
-  transition: ${(props) => props.theme.backgroundTransition};
+  background: ${s("background")};
+  transition: ${s("backgroundTransition")};
   position: relative;
   width: 100%;
   min-height: 100%;

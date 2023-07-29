@@ -5,6 +5,7 @@ import { getCookie, setCookie, removeCookie } from "tiny-cookie";
 import { CustomTheme, TeamPreferences, UserPreferences } from "@shared/types";
 import Storage from "@shared/utils/Storage";
 import { getCookieDomain, parseDomain } from "@shared/utils/domains";
+import { Hour } from "@shared/utils/time";
 import RootStore from "~/stores/RootStore";
 import Policy from "~/models/Policy";
 import Team from "~/models/Team";
@@ -12,13 +13,15 @@ import User from "~/models/User";
 import env from "~/env";
 import { client } from "~/utils/ApiClient";
 import Desktop from "~/utils/Desktop";
+import Logger from "~/utils/Logger";
 
 const AUTH_STORE = "AUTH_STORE";
-const NO_REDIRECT_PATHS = ["/", "/create", "/home"];
+const NO_REDIRECT_PATHS = ["/", "/create", "/home", "/logout"];
 
 type PersistedData = {
   user?: User;
   team?: Team;
+  collaborationToken?: string;
   availableTeams?: {
     id: string;
     name: string;
@@ -44,12 +47,19 @@ export type Config = {
 };
 
 export default class AuthStore {
+  /* The user that is currently signed in. */
   @observable
   user?: User | null;
 
+  /* The team that the current user is signed into. */
   @observable
   team?: Team | null;
 
+  /* A short-lived token to be used to authenticate with the collaboration server. */
+  @observable
+  collaborationToken?: string | null;
+
+  /* A list of teams that the current user has access to. */
   @observable
   availableTeams?: {
     id: string;
@@ -59,24 +69,30 @@ export default class AuthStore {
     isSignedIn: boolean;
   }[];
 
-  @observable
-  token?: string | null;
-
+  /* A list of cancan policies for the current user. */
   @observable
   policies: Policy[] = [];
 
+  /* The authentication provider the user signed in with. */
   @observable
   lastSignedIn?: string | null;
 
+  /* Whether the user is currently saving their profile or team settings. */
   @observable
   isSaving = false;
 
   @observable
+  isFetching = true;
+
+  /* Whether the user is currently suspended. */
+  @observable
   isSuspended = false;
 
+  /* The email address to contact if the user is suspended. */
   @observable
   suspendedContactEmail?: string | null;
 
+  /* The auth configuration for the current domain. */
   @observable
   config: Config | null | undefined;
 
@@ -88,6 +104,10 @@ export default class AuthStore {
     const data: PersistedData = Storage.get(AUTH_STORE) || {};
 
     this.rehydrate(data);
+    void this.fetch();
+
+    // Refresh the auth store every 12 hours that the window is open
+    setInterval(this.fetch, 12 * Hour);
 
     // persists this entire store to localstorage whenever any keys are changed
     autorun(() => {
@@ -110,7 +130,7 @@ export default class AuthStore {
         // we are signed in and the received data contains no user then sign out
         if (this.authenticated) {
           if (data.user === null) {
-            this.logout();
+            void this.logout(false, false);
           }
         } else {
           this.rehydrate(data);
@@ -123,13 +143,9 @@ export default class AuthStore {
   rehydrate(data: PersistedData) {
     this.user = data.user ? new User(data.user, this) : undefined;
     this.team = data.team ? new Team(data.team, this) : undefined;
-    this.token = getCookie("accessToken");
+    this.collaborationToken = data.collaborationToken;
     this.lastSignedIn = getCookie("lastSignedIn");
     this.addPolicies(data.policies);
-
-    if (this.token) {
-      setTimeout(() => this.fetch(), 0);
-    }
   }
 
   addPolicies(policies?: Policy[]) {
@@ -142,7 +158,7 @@ export default class AuthStore {
 
   @computed
   get authenticated(): boolean {
-    return !!this.token;
+    return !!this.user && !!this.team;
   }
 
   @computed
@@ -150,6 +166,7 @@ export default class AuthStore {
     return {
       user: this.user,
       team: this.team,
+      collaborationToken: this.collaborationToken,
       availableTeams: this.availableTeams,
       policies: this.policies,
     };
@@ -164,6 +181,8 @@ export default class AuthStore {
 
   @action
   fetch = async () => {
+    this.isFetching = true;
+
     try {
       const res = await client.post("/auth.info", undefined, {
         credentials: "same-origin",
@@ -175,6 +194,7 @@ export default class AuthStore {
         this.user = new User(user, this);
         this.team = new Team(team, this);
         this.availableTeams = res.data.availableTeams;
+        this.collaborationToken = res.data.collaborationToken;
 
         if (env.SENTRY_DSN) {
           Sentry.configureScope(function (scope) {
@@ -219,13 +239,13 @@ export default class AuthStore {
         this.isSuspended = true;
         this.suspendedContactEmail = err.data.adminEmail;
       }
+    } finally {
+      this.isFetching = false;
     }
   };
 
   @action
-  requestDelete = () => {
-    return client.post(`/users.requestDelete`);
-  };
+  requestDelete = () => client.post(`/users.requestDelete`);
 
   @action
   deleteUser = async (data: { code: string }) => {
@@ -233,11 +253,11 @@ export default class AuthStore {
     runInAction("AuthStore#updateUser", () => {
       this.user = null;
       this.team = null;
+      this.collaborationToken = null;
       this.availableTeams = this.availableTeams?.filter(
         (team) => team.id !== this.team?.id
       );
       this.policies = [];
-      this.token = null;
     });
   };
 
@@ -307,7 +327,15 @@ export default class AuthStore {
   };
 
   @action
-  logout = async (savePath = false) => {
+  logout = async (
+    /** Whether the current path should be saved and returned to after login */
+    savePath = false,
+    /**
+     * Whether the auth token should attempt to be revoked, this should be disabled
+     * with requests from ApiClient to prevent infinite loops.
+     */
+    tryRevokingToken = true
+  ) => {
     // if this logout was forced from an authenticated route then
     // save the current path so we can go back there once signed in
     if (savePath) {
@@ -318,18 +346,14 @@ export default class AuthStore {
       }
     }
 
-    // If there is no auth token stored there is nothing else to do
-    if (!this.token) {
-      return;
+    if (tryRevokingToken) {
+      try {
+        // invalidate authentication token on server and unset auth cookie
+        await client.post(`/auth.delete`);
+      } catch (err) {
+        Logger.error("Failed to delete authentication", err);
+      }
     }
-
-    // invalidate authentication token on server
-    client.post(`/auth.delete`);
-
-    // remove authentication token itself
-    removeCookie("accessToken", {
-      path: "/",
-    });
 
     // remove session record on apex cookie
     const team = this.team;
@@ -345,10 +369,11 @@ export default class AuthStore {
     // clear all credentials from cache (and local storage via autorun)
     this.user = null;
     this.team = null;
+    this.collaborationToken = null;
     this.policies = [];
-    this.token = null;
 
     // Tell the host application we logged out, if any – allows window cleanup.
-    Desktop.bridge?.onLogout?.();
+    void Desktop.bridge?.onLogout?.();
+    this.rootStore.logout();
   };
 }

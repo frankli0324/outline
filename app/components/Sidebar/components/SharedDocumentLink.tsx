@@ -42,9 +42,10 @@ function DocumentLink(
     !!node.children.length || activeDocument?.parentDocumentId === node.id;
   const document = documents.get(node.id);
 
-  const showChildren = React.useMemo(() => {
-    return !!hasChildDocuments;
-  }, [hasChildDocuments]);
+  const showChildren = React.useMemo(
+    () => !!hasChildDocuments,
+    [hasChildDocuments]
+  );
 
   const [expanded, setExpanded] = React.useState(showChildren);
 
@@ -53,6 +54,12 @@ function DocumentLink(
       setExpanded(showChildren);
     }
   }, [showChildren]);
+
+  React.useEffect(() => {
+    if (isActiveDocument) {
+      setExpanded(true);
+    }
+  }, [isActiveDocument]);
 
   const handleDisclosureClick = React.useCallback(
     (ev: React.SyntheticEvent) => {
@@ -111,9 +118,7 @@ function DocumentLink(
         scrollIntoViewIfNeeded={!document?.isStarred}
         isDraft={isDraft}
         ref={ref}
-        isActive={() => {
-          return !!isActiveDocument;
-        }}
+        isActive={() => !!isActiveDocument}
       />
       {expanded &&
         nodeChildren.map((childNode, index) => (

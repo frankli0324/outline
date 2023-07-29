@@ -1,5 +1,5 @@
+import commandScore from "command-score";
 import { capitalize } from "lodash";
-import { findParentNode } from "prosemirror-utils";
 import * as React from "react";
 import { Trans } from "react-i18next";
 import { VisuallyHidden } from "reakit/VisuallyHidden";
@@ -7,14 +7,16 @@ import styled from "styled-components";
 import insertFiles from "@shared/editor/commands/insertFiles";
 import { EmbedDescriptor } from "@shared/editor/embeds";
 import filterExcessSeparators from "@shared/editor/lib/filterExcessSeparators";
+import { findParentNode } from "@shared/editor/queries/findParentNode";
 import { MenuItem } from "@shared/editor/types";
-import { depths } from "@shared/styles";
+import { depths, s } from "@shared/styles";
 import { getEventFiles } from "@shared/utils/files";
 import { AttachmentValidation } from "@shared/validations";
 import { Portal } from "~/components/Portal";
 import Scrollable from "~/components/Scrollable";
 import useDictionary from "~/hooks/useDictionary";
 import useToasts from "~/hooks/useToasts";
+import Logger from "~/utils/Logger";
 import { useEditor } from "./EditorContext";
 import Input from "./Input";
 
@@ -45,7 +47,7 @@ type Position = ((TopAnchor | BottomAnchor) & (LeftAnchor | RightAnchor)) & {
 const defaultPosition: Position = {
   top: 0,
   bottom: undefined,
-  left: -1000,
+  left: -10000,
   right: undefined,
   isAbove: false,
 };
@@ -54,12 +56,12 @@ export type Props<T extends MenuItem = MenuItem> = {
   rtl: boolean;
   isActive: boolean;
   search: string;
+  trigger: string;
   uploadFile?: (file: File) => Promise<string>;
   onFileUploadStart?: () => void;
   onFileUploadStop?: () => void;
   onLinkToolbarOpen?: () => void;
   onClose: (insertNewLine?: boolean) => void;
-  onClearSearch: () => void;
   embeds?: EmbedDescriptor[];
   renderMenuItem: (
     item: T,
@@ -98,7 +100,7 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
           fromPos = view.coordsAtPos(selection.from);
           toPos = view.coordsAtPos(selection.to, -1);
         } catch (err) {
-          console.warn(err);
+          Logger.warn("Unable to calculate caret position", err);
           return {
             top: 0,
             bottom: 0,
@@ -161,6 +163,30 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
     [view]
   );
 
+  const handleClearSearch = React.useCallback(() => {
+    const { state, dispatch } = view;
+    const poss = state.doc.cut(
+      state.selection.from - (props.search ?? "").length - props.trigger.length,
+      state.selection.from
+    );
+    const trimTrigger = poss.textContent.startsWith(props.trigger);
+
+    if (!props.search && !trimTrigger) {
+      return;
+    }
+
+    // clear search input
+    dispatch(
+      state.tr.insertText(
+        "",
+        state.selection.from -
+          (props.search ?? "").length -
+          (trimTrigger ? props.trigger.length : 0),
+        state.selection.to
+      )
+    );
+  }, [props.search, props.trigger, view]);
+
   React.useEffect(() => {
     if (!props.isActive) {
       return;
@@ -183,14 +209,16 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
 
   const insertNode = React.useCallback(
     (item: MenuItem | EmbedDescriptor) => {
-      props.onClearSearch();
+      handleClearSearch();
 
       const command = item.name ? commands[item.name] : undefined;
+      const attrs =
+        typeof item.attrs === "function" ? item.attrs(view.state) : item.attrs;
 
       if (command) {
-        command(item.attrs);
+        command(attrs);
       } else {
-        commands[`create${capitalize(item.name)}`](item.attrs);
+        commands[`create${capitalize(item.name)}`](attrs);
       }
       if ("appendSpace" in item) {
         const { dispatch } = view;
@@ -199,7 +227,7 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
 
       props.onClose();
     },
-    [commands, props, view]
+    [commands, handleClearSearch, props, view]
   );
 
   const handleClickItem = React.useCallback(
@@ -214,7 +242,7 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
         case "embed":
           return triggerLinkInput(item);
         case "link": {
-          props.onClearSearch();
+          handleClearSearch();
           props.onClose();
           props.onLinkToolbarOpen?.();
           return;
@@ -223,7 +251,7 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
           insertNode(item);
       }
     },
-    [insertNode, props]
+    [insertNode, handleClearSearch, props]
   );
 
   const close = React.useCallback(() => {
@@ -234,6 +262,9 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
   const handleLinkInputKeydown = (
     event: React.KeyboardEvent<HTMLInputElement>
   ) => {
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
     if (!props.isActive) {
       return;
     }
@@ -311,7 +342,7 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
     const files = getEventFiles(event);
     const parent = findParentNode((node) => !!node)(view.state.selection);
 
-    props.onClearSearch();
+    handleClearSearch();
 
     if (!uploadFile) {
       throw new Error("uploadFile prop is required to replace files");
@@ -396,12 +427,9 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
     });
 
     return filterExcessSeparators(
-      filtered.sort((item) => {
-        return searchInput &&
-          (item.title || "").toLowerCase().startsWith(searchInput)
-          ? -1
-          : 1;
-      })
+      filtered.sort((item) =>
+        searchInput && item.title ? commandScore(item.title, searchInput) : 0
+      )
     );
   }, [commands, props]);
 
@@ -418,6 +446,9 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing) {
+        return;
+      }
       if (!props.isActive) {
         return;
       }
@@ -485,11 +516,15 @@ function SuggestionsMenu<T extends MenuItem>(props: Props<T>) {
     };
 
     window.addEventListener("mousedown", handleMouseDown);
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, {
+      capture: true,
+    });
 
     return () => {
       window.removeEventListener("mousedown", handleMouseDown);
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, {
+        capture: true,
+      });
     };
   }, [close, filtered, handleClickItem, props, selectedIndex]);
 
@@ -579,7 +614,7 @@ const LinkInputWrapper = styled.div`
 const LinkInput = styled(Input)`
   height: 32px;
   width: 100%;
-  color: ${(props) => props.theme.textSecondary};
+  color: ${s("textSecondary")};
 `;
 
 const List = styled.ol`
@@ -598,7 +633,7 @@ const ListItem = styled.li`
 const Empty = styled.div`
   display: flex;
   align-items: center;
-  color: ${(props) => props.theme.textSecondary};
+  color: ${s("textSecondary")};
   font-weight: 500;
   font-size: 14px;
   height: 32px;
@@ -612,14 +647,14 @@ export const Wrapper = styled(Scrollable)<{
   left?: number;
   isAbove: boolean;
 }>`
-  color: ${(props) => props.theme.textSecondary};
-  font-family: ${(props) => props.theme.fontFamily};
+  color: ${s("textSecondary")};
+  font-family: ${s("fontFamily")};
   position: absolute;
   z-index: ${depths.editorToolbar};
   ${(props) => props.top !== undefined && `top: ${props.top}px`};
   ${(props) => props.bottom !== undefined && `bottom: ${props.bottom}px`};
   left: ${(props) => props.left}px;
-  background: ${(props) => props.theme.menuBackground};
+  background: ${s("menuBackground")};
   border-radius: 6px;
   box-shadow: rgba(0, 0, 0, 0.05) 0px 0px 0px 1px,
     rgba(0, 0, 0, 0.08) 0px 4px 8px, rgba(0, 0, 0, 0.08) 0px 2px 4px;
@@ -643,7 +678,7 @@ export const Wrapper = styled(Scrollable)<{
   hr {
     border: 0;
     height: 0;
-    border-top: 1px solid ${(props) => props.theme.divider};
+    border-top: 1px solid ${s("divider")};
   }
 
   ${({ active, isAbove }) =>

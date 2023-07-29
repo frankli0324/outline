@@ -30,10 +30,10 @@ function Slack() {
   const error = query.get("error");
 
   React.useEffect(() => {
-    collections.fetchPage({
+    void collections.fetchPage({
       limit: 100,
     });
-    integrations.fetchPage({
+    void integrations.fetchPage({
       limit: 100,
     });
   }, [collections, integrations]);
@@ -62,7 +62,7 @@ function Slack() {
       {error === "access_denied" && (
         <Notice>
           <Trans>
-            Whoops, you need to accept the permissions in Slack to connect
+            Whoops, you need to accept the permissions in Slack to connect{" "}
             {{ appName }} to your team. Try again?
           </Trans>
         </Notice>
@@ -101,8 +101,8 @@ function Slack() {
                   "links:read",
                   "links:write",
                   // TODO: Wait forever for Slack to approve these scopes.
-                  //"users:read",
-                  //"users:read.email",
+                  // "users:read",
+                  // "users:read.email",
                 ]}
                 redirectUri={`${env.URL}/auth/slack.commands`}
                 state={team.id}

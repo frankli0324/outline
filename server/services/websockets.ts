@@ -1,9 +1,10 @@
 import http, { IncomingMessage } from "http";
 import { Duplex } from "stream";
-import invariant from "invariant";
+import cookie from "cookie";
 import Koa from "koa";
 import IO from "socket.io";
 import { createAdapter } from "socket.io-redis";
+import { AuthenticationError } from "@server/errors";
 import Logger from "@server/logging/Logger";
 import Metrics from "@server/logging/Metrics";
 import * as Tracing from "@server/logging/tracer";
@@ -53,25 +54,23 @@ export default function init(
     );
   }
 
-  server.on("upgrade", function (
-    req: IncomingMessage,
-    socket: Duplex,
-    head: Buffer
-  ) {
-    if (req.url?.startsWith(path)) {
-      invariant(ioHandleUpgrade, "Existing upgrade handler must exist");
-      ioHandleUpgrade(req, socket, head);
-      return;
-    }
+  server.on(
+    "upgrade",
+    function (req: IncomingMessage, socket: Duplex, head: Buffer) {
+      if (req.url?.startsWith(path) && ioHandleUpgrade) {
+        ioHandleUpgrade(req, socket, head);
+        return;
+      }
 
-    if (serviceNames.includes("collaboration")) {
-      // Nothing to do, the collaboration service will handle this request
-      return;
-    }
+      if (serviceNames.includes("collaboration")) {
+        // Nothing to do, the collaboration service will handle this request
+        return;
+      }
 
-    // If the collaboration service isn't running then we need to close the connection
-    socket.end(`HTTP/1.1 400 Bad Request\r\n`);
-  });
+      // If the collaboration service isn't running then we need to close the connection
+      socket.end(`HTTP/1.1 400 Bad Request\r\n`);
+    }
+  );
 
   ShutdownHelper.add("websockets", ShutdownOrder.normal, async () => {
     Metrics.gaugePerInstance("websockets.count", 0);
@@ -93,29 +92,13 @@ export default function init(
     }
   });
 
-  io.on("connection", (socket: SocketWithAuth) => {
+  io.on("connection", async (socket: SocketWithAuth) => {
     Metrics.increment("websockets.connected");
     Metrics.gaugePerInstance("websockets.count", io.engine.clientsCount);
-
-    socket.on("authentication", async function (data) {
-      try {
-        await authenticate(socket, data);
-        Logger.debug("websockets", `Authenticated socket ${socket.id}`);
-
-        socket.emit("authenticated", true);
-        void authenticated(io, socket);
-      } catch (err) {
-        Logger.error(`Authentication error socket ${socket.id}`, err);
-        socket.emit("unauthorized", { message: err.message }, function () {
-          socket.disconnect();
-        });
-      }
-    });
 
     socket.on("disconnect", async () => {
       Metrics.increment("websockets.disconnected");
       Metrics.gaugePerInstance("websockets.count", io.engine.clientsCount);
-      await Redis.defaultClient.hdel(socket.id, "userId");
     });
 
     setTimeout(function () {
@@ -127,27 +110,44 @@ export default function init(
         socket.disconnect("unauthorized");
       }
     }, 1000);
+
+    try {
+      await authenticate(socket);
+      Logger.debug("websockets", `Authenticated socket ${socket.id}`);
+
+      socket.emit("authenticated", true);
+      void authenticated(io, socket);
+    } catch (err) {
+      Logger.error(`Authentication error socket ${socket.id}`, err);
+      socket.emit("unauthorized", { message: err.message }, function () {
+        socket.disconnect();
+      });
+    }
   });
 
   // Handle events from event queue that should be sent to the clients down ws
   const websockets = new WebsocketsProcessor();
-  websocketQueue.process(
-    traceFunction({
-      serviceName: "websockets",
-      spanName: "process",
-      isRoot: true,
-    })(async function (job) {
-      const event = job.data;
+  websocketQueue
+    .process(
+      traceFunction({
+        serviceName: "websockets",
+        spanName: "process",
+        isRoot: true,
+      })(async function (job) {
+        const event = job.data;
 
-      Tracing.setResource(`Processor.WebsocketsProcessor`);
+        Tracing.setResource(`Processor.WebsocketsProcessor`);
 
-      websockets.perform(event, io).catch((error) => {
-        Logger.error("Error processing websocket event", error, {
-          event,
+        websockets.perform(event, io).catch((error) => {
+          Logger.error("Error processing websocket event", error, {
+            event,
+          });
         });
-      });
-    })
-  );
+      })
+    )
+    .catch((err) => {
+      Logger.fatal("Error starting websocketQueue", err);
+    });
 }
 
 async function authenticated(io: IO.Server, socket: SocketWithAuth) {
@@ -168,9 +168,6 @@ async function authenticated(io: IO.Server, socket: SocketWithAuth) {
   collectionIds.forEach((collectionId) =>
     rooms.push(`collection-${collectionId}`)
   );
-
-  // join all of the rooms at once
-  socket.join(rooms);
 
   // allow the client to request to join rooms
   socket.on("join", async (event) => {
@@ -195,21 +192,26 @@ async function authenticated(io: IO.Server, socket: SocketWithAuth) {
       Metrics.increment("websockets.collections.leave");
     }
   });
+
+  // join all of the rooms at once
+  await socket.join(rooms);
 }
 
 /**
  * Authenticate the socket with the given token, attach the user model for the
  * duration of the session.
  */
-async function authenticate(socket: SocketWithAuth, data: { token: string }) {
-  const { token } = data;
+async function authenticate(socket: SocketWithAuth) {
+  const cookies = socket.request.headers.cookie
+    ? cookie.parse(socket.request.headers.cookie)
+    : {};
+  const { accessToken } = cookies;
 
-  const user = await getUserForJWT(token);
+  if (!accessToken) {
+    throw AuthenticationError("No access token");
+  }
+
+  const user = await getUserForJWT(accessToken);
   socket.client.user = user;
-
-  // store the mapping between socket id and user id in redis so that it is
-  // accessible across multiple websocket servers. Lasts 24 hours, if they have
-  // a websocket connection that lasts this long then well done.
-  await Redis.defaultClient.hset(socket.id, "userId", user.id);
-  await Redis.defaultClient.expire(socket.id, 3600 * 24);
+  return user;
 }

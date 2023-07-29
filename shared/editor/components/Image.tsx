@@ -3,6 +3,7 @@ import type { EditorView } from "prosemirror-view";
 import * as React from "react";
 import styled from "styled-components";
 import breakpoint from "styled-components-breakpoint";
+import { s } from "../../styles";
 import { sanitizeUrl } from "../../utils/urls";
 import { ComponentProps } from "../types";
 import ImageZoom from "./ImageZoom";
@@ -35,7 +36,7 @@ const Image = (
   const [offset, setOffset] = React.useState(0);
   const [dragging, setDragging] = React.useState<DragDirection>();
   const [documentWidth, setDocumentWidth] = React.useState(
-    props.view?.dom.clientWidth || 0
+    props.view ? getInnerWidth(props.view.dom) : 0
   );
   const maxWidth = layoutClass ? documentWidth / 3 : documentWidth;
   const isFullWidth = layoutClass === "full-width";
@@ -50,7 +51,7 @@ const Image = (
       const contentWidth =
         document.body.querySelector("#full-width-container")?.clientWidth || 0;
       setContentWidth(contentWidth);
-      setDocumentWidth(props.view?.dom.clientWidth || 0);
+      setDocumentWidth(props.view ? getInnerWidth(props.view.dom) : 0);
     };
 
     window.addEventListener("resize", handleResize);
@@ -99,18 +100,18 @@ const Image = (
     document.removeEventListener("mousemove", handlePointerMove);
   };
 
-  const handlePointerDown = (dragging: "left" | "right") => (
-    event: React.PointerEvent<HTMLDivElement>
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setSizeAtDragStart({
-      width: constrainWidth(size.width),
-      height: size.height,
-    });
-    setOffset(event.pageX);
-    setDragging(dragging);
-  };
+  const handlePointerDown =
+    (dragging: "left" | "right") =>
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setSizeAtDragStart({
+        width: constrainWidth(size.width),
+        height: size.height,
+      });
+      setOffset(event.pageX);
+      setDragging(dragging);
+    };
 
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
@@ -169,11 +170,14 @@ const Image = (
         onClick={dragging ? undefined : props.onClick}
         style={widthStyle}
       >
-        {!dragging && size.width > 60 && size.height > 60 && props.onDownload && (
-          <Button onClick={props.onDownload}>
-            <DownloadIcon color="currentColor" />
-          </Button>
-        )}
+        {!dragging &&
+          size.width > 60 &&
+          size.height > 60 &&
+          props.onDownload && (
+            <Button onClick={props.onDownload}>
+              <DownloadIcon />
+            </Button>
+          )}
         <ImageZoom zoomMargin={24}>
           <img
             style={{
@@ -199,15 +203,17 @@ const Image = (
               }
             }}
           />
-          <img
-            style={{
-              ...widthStyle,
-              display: loaded ? "none" : "block",
-            }}
-            src={`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-              getPlaceholder(size.width, size.height)
-            )}`}
-          />
+          {!loaded && (
+            <img
+              style={{
+                ...widthStyle,
+                display: "block",
+              }}
+              src={`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+                getPlaceholder(size.width, size.height)
+              )}`}
+            />
+          )}
         </ImageZoom>
         {isEditable && !isFullWidth && isResizable && (
           <>
@@ -229,6 +235,16 @@ const Image = (
   );
 };
 
+function getInnerWidth(element: Element) {
+  const computedStyle = window.getComputedStyle(element, null);
+  let width = element.clientWidth;
+  width -=
+    parseFloat(computedStyle.paddingLeft) +
+    parseFloat(computedStyle.paddingRight);
+
+  return width;
+}
+
 function getPlaceholder(width: number, height: number) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" />`;
 }
@@ -238,7 +254,7 @@ export const Caption = styled.p`
   display: block;
   font-style: italic;
   font-weight: normal;
-  color: ${(props) => props.theme.textSecondary};
+  color: ${s("textSecondary")};
   padding: 8px 0 4px;
   line-height: 16px;
   text-align: center;
@@ -259,7 +275,7 @@ export const Caption = styled.p`
   }
 
   &:empty:before {
-    color: ${(props) => props.theme.placeholder};
+    color: ${s("placeholder")};
     content: attr(data-caption);
     pointer-events: none;
   }
@@ -286,8 +302,8 @@ const ResizeLeft = styled.div<{ $dragging: boolean }>`
     height: 15%;
     min-height: 20px;
     border-radius: 4px;
-    background: ${(props) => props.theme.toolbarBackground};
-    box-shadow: 0 0 0 1px ${(props) => props.theme.toolbarItem};
+    background: ${s("menuBackground")};
+    box-shadow: 0 0 0 1px ${s("textSecondary")};
     opacity: 0.75;
   }
 `;
@@ -310,8 +326,8 @@ const Button = styled.button`
   margin: 0;
   padding: 0;
   border-radius: 4px;
-  background: ${(props) => props.theme.background};
-  color: ${(props) => props.theme.textSecondary};
+  background: ${s("background")};
+  color: ${s("textSecondary")};
   width: 24px;
   height: 24px;
   display: inline-block;
@@ -324,7 +340,7 @@ const Button = styled.button`
   }
 
   &:hover {
-    color: ${(props) => props.theme.text};
+    color: ${s("text")};
     opacity: 1;
   }
 `;

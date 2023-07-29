@@ -4,7 +4,6 @@ import { find, map } from "lodash";
 import queryParser from "pg-tsquery";
 import { Op, QueryTypes, WhereOptions } from "sequelize";
 import { DateFilter } from "@shared/types";
-import unescape from "@shared/utils/unescape";
 import { sequelize } from "@server/database/sequelize";
 import Collection from "@server/models/Collection";
 import Document from "@server/models/Document";
@@ -31,7 +30,7 @@ type SearchOptions = {
   /** The query offset for pagination */
   offset?: number;
   /** Limit results to a collection. Authorization is presumed to have been done before passing to this helper. */
-  collectionId?: string;
+  collectionId?: string | null;
   /** Limit results to a shared document. */
   share?: Share;
   /** Limit results to a date range. */
@@ -410,7 +409,7 @@ export default class SearchHelper {
     return {
       results: map(results, (result) => ({
         ranking: result.searchRanking,
-        context: removeMarkdown(unescape(result.searchContext), {
+        context: removeMarkdown(result.searchContext, {
           stripHTML: false,
         }),
         document: find(documents, {

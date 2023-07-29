@@ -4,12 +4,13 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { Portal } from "react-portal";
 import styled from "styled-components";
-import { depths } from "@shared/styles";
+import { depths, s, ellipsis } from "@shared/styles";
 import Button from "~/components/Button";
 import Flex from "~/components/Flex";
 import Scrollable from "~/components/Scrollable";
 import Tooltip from "~/components/Tooltip";
 import useMobile from "~/hooks/useMobile";
+import { draggableOnDesktop } from "~/styles";
 import { fadeIn } from "~/styles/animations";
 
 type Props = React.HTMLAttributes<HTMLDivElement> & {
@@ -66,7 +67,7 @@ const Backdrop = styled.a`
   right: 0;
   cursor: default;
   z-index: ${depths.sidebar - 1};
-  background: ${(props) => props.theme.backdrop};
+  background: ${s("backdrop")};
 `;
 
 const ForwardIcon = styled(BackIcon)`
@@ -75,24 +76,23 @@ const ForwardIcon = styled(BackIcon)`
 `;
 
 const Title = styled(Flex)`
+  ${ellipsis()}
   font-size: 16px;
   font-weight: 600;
   text-align: center;
   align-items: center;
   justify-content: flex-start;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   user-select: none;
-  overflow: hidden;
   width: 0;
   flex-grow: 1;
 `;
 
 const Header = styled(Flex)`
+  ${draggableOnDesktop()}
   align-items: center;
   position: relative;
   padding: 16px 12px 16px 16px;
-  color: ${(props) => props.theme.text};
+  color: ${s("text")};
   flex-shrink: 0;
 `;
 

@@ -21,6 +21,7 @@ import {
   ValidationError,
   IncorrectEditionError,
 } from "@server/errors";
+import Logger from "@server/logging/Logger";
 import auth from "@server/middlewares/authentication";
 import { rateLimiter } from "@server/middlewares/rateLimiter";
 import validate from "@server/middlewares/validate";
@@ -98,7 +99,7 @@ router.post(
       const collection = await Collection.scope({
         method: ["withMembership", user.id],
       }).findByPk(collectionId);
-      authorize(user, "read", collection);
+      authorize(user, "readDocument", collection);
 
       // index sort is special because it uses the order of the documents in the
       // collection.documentStructure rather than a database column
@@ -342,7 +343,7 @@ router.post(
       const collection = await Collection.scope({
         method: ["withMembership", user.id],
       }).findByPk(collectionId);
-      authorize(user, "read", collection);
+      authorize(user, "readDocument", collection);
     }
 
     const collectionIds = collectionId
@@ -452,20 +453,28 @@ router.post(
 
     let users: User[] = [];
     let total = 0;
+    let where: WhereOptions<User> = {
+      teamId: document.teamId,
+      suspendedAt: {
+        [Op.is]: null,
+      },
+    };
 
     if (document.collectionId) {
-      const memberIds = await Collection.membershipUserIds(
-        document.collectionId
-      );
+      const collection = await document.$get("collection");
 
-      let where: WhereOptions<User> = {
-        id: {
-          [Op.in]: memberIds,
-        },
-        suspendedAt: {
-          [Op.is]: null,
-        },
-      };
+      if (!collection?.permission) {
+        const memberIds = await Collection.membershipUserIds(
+          document.collectionId
+        );
+        where = {
+          ...where,
+          id: {
+            [Op.in]: memberIds,
+          },
+        };
+      }
+
       if (query) {
         where = {
           ...where,
@@ -574,9 +583,11 @@ router.post(
       document.collectionId = collectionId;
     }
 
-    const collection = await Collection.scope({
-      method: ["withMembership", user.id],
-    }).findByPk(document.collectionId);
+    const collection = document.collectionId
+      ? await Collection.scope({
+          method: ["withMembership", user.id],
+        }).findByPk(document.collectionId)
+      : undefined;
 
     // if the collectionId was provided in the request and isn't valid then it will
     // be caught as a 403 on the authorize call below. Otherwise we're checking here
@@ -589,7 +600,7 @@ router.post(
     }
 
     if (document.collection) {
-      authorize(user, "update", collection);
+      authorize(user, "updateDocument", collection);
     }
 
     if (document.deletedAt) {
@@ -676,7 +687,7 @@ router.post(
       const collection = await Collection.scope({
         method: ["withMembership", user.id],
       }).findByPk(collectionId);
-      authorize(user, "read", collection);
+      authorize(user, "readDocument", collection);
     }
 
     if (userId) {
@@ -770,7 +781,7 @@ router.post(
         const collection = await Collection.scope({
           method: ["withMembership", user.id],
         }).findByPk(collectionId);
-        authorize(user, "read", collection);
+        authorize(user, "readDocument", collection);
       }
 
       let collaboratorIds = undefined;
@@ -805,13 +816,15 @@ router.post(
     // When requesting subsequent pages of search results we don't want to record
     // duplicate search query records
     if (offset === 0) {
-      SearchQuery.create({
+      void SearchQuery.create({
         userId: user?.id,
         teamId,
         shareId,
         source: ctx.state.auth.type || "app", // we'll consider anything that isn't "api" to be "app"
         query,
         results: totalCount,
+      }).catch((err) => {
+        Logger.error("Failed to create search query", err);
       });
     }
 
@@ -879,17 +892,8 @@ router.post(
   auth(),
   validate(T.DocumentsUpdateSchema),
   async (ctx: APIContext<T.DocumentsUpdateReq>) => {
-    const {
-      id,
-      title,
-      text,
-      fullWidth,
-      publish,
-      templateId,
-      collectionId,
-      append,
-      apiVersion,
-    } = ctx.input.body;
+    const { id, apiVersion, insightsEnabled, publish, collectionId, ...input } =
+      ctx.input.body;
     const editorVersion = ctx.headers["x-editor-version"] as string | undefined;
     const { user } = ctx.state.auth;
     let collection: Collection | null | undefined;
@@ -901,32 +905,39 @@ router.post(
     collection = document?.collection;
     authorize(user, "update", document);
 
+    if (collection && insightsEnabled !== undefined) {
+      authorize(user, "updateInsights", document);
+    }
+
     if (publish) {
       if (!document.collectionId) {
         assertPresent(
           collectionId,
           "collectionId is required to publish a draft without collection"
         );
-        collection = await Collection.findByPk(collectionId as string);
+        collection = await Collection.scope({
+          method: ["withMembership", user.id],
+        }).findByPk(collectionId!);
       }
-      authorize(user, "publish", collection);
+      authorize(user, "createDocument", collection);
     }
 
     collection = await sequelize.transaction(async (transaction) => {
       await documentUpdater({
         document,
         user,
-        title,
-        text,
-        fullWidth,
+        ...input,
         publish,
         collectionId,
-        append,
-        templateId,
+        insightsEnabled,
         editorVersion,
         transaction,
         ip: ctx.request.ip,
       });
+
+      if (!document.collectionId) {
+        return null;
+      }
 
       return await Collection.scope({
         method: ["withMembership", user.id],
@@ -966,7 +977,7 @@ router.post(
     const collection = await Collection.scope({
       method: ["withMembership", user.id],
     }).findByPk(collectionId);
-    authorize(user, "update", collection);
+    authorize(user, "updateDocument", collection);
 
     if (parentDocumentId) {
       const parent = await Document.findByPk(parentDocumentId, {
@@ -979,21 +990,18 @@ router.post(
       }
     }
 
-    const {
-      documents,
-      collections,
-      collectionChanged,
-    } = await sequelize.transaction(async (transaction) =>
-      documentMover({
-        user,
-        document,
-        collectionId,
-        parentDocumentId,
-        index,
-        ip: ctx.request.ip,
-        transaction,
-      })
-    );
+    const { documents, collections, collectionChanged } =
+      await sequelize.transaction(async (transaction) =>
+        documentMover({
+          user,
+          document,
+          collectionId,
+          parentDocumentId,
+          index,
+          ip: ctx.request.ip,
+          transaction,
+        })
+      );
 
     ctx.body = {
       data: {
@@ -1189,7 +1197,7 @@ router.post(
         teamId: user.teamId,
       },
     });
-    authorize(user, "publish", collection);
+    authorize(user, "createDocument", collection);
     let parentDocument;
 
     if (parentDocumentId) {
@@ -1206,7 +1214,7 @@ router.post(
 
     const content = await fs.readFile(file.filepath);
     const document = await sequelize.transaction(async (transaction) => {
-      const { text, title } = await documentImporter({
+      const { text, state, title } = await documentImporter({
         user,
         fileName: file.originalFilename ?? file.newFilename,
         mimeType: file.mimetype ?? "",
@@ -1219,6 +1227,7 @@ router.post(
         source: "import",
         title,
         text,
+        state,
         publish,
         collectionId,
         parentDocumentId,
@@ -1248,6 +1257,7 @@ router.post(
       publish,
       collectionId,
       parentDocumentId,
+      fullWidth,
       templateId,
       template,
     } = ctx.input.body;
@@ -1266,7 +1276,7 @@ router.post(
           teamId: user.teamId,
         },
       });
-      authorize(user, "publish", collection);
+      authorize(user, "createDocument", collection);
     }
 
     let parentDocument;
@@ -1292,8 +1302,8 @@ router.post(
       authorize(user, "read", templateDocument);
     }
 
-    const document = await sequelize.transaction(async (transaction) => {
-      return documentCreator({
+    const document = await sequelize.transaction(async (transaction) =>
+      documentCreator({
         title,
         text,
         publish,
@@ -1301,12 +1311,13 @@ router.post(
         parentDocumentId,
         templateDocument,
         template,
+        fullWidth,
         user,
         editorVersion,
         ip: ctx.request.ip,
         transaction,
-      });
-    });
+      })
+    );
 
     document.collection = collection;
 

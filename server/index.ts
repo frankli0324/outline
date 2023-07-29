@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable import/order */
 import env from "./env";
 
@@ -18,16 +19,13 @@ import services from "./services";
 import { getArg } from "./utils/args";
 import { getSSLOptions } from "./utils/ssl";
 import { defaultRateLimiter } from "@server/middlewares/rateLimiter";
-import {
-  checkEnv,
-  checkMigrations,
-  checkPendingMigrations,
-} from "./utils/startup";
+import { checkEnv, checkPendingMigrations } from "./utils/startup";
 import { checkUpdates } from "./utils/updates";
 import onerror from "./onerror";
 import ShutdownHelper, { ShutdownOrder } from "./utils/ShutdownHelper";
 import { sequelize } from "./database/sequelize";
 import RedisAdapter from "./redis";
+import Metrics from "./logging/Metrics";
 
 // The default is to run all services to make development and OSS installations
 // easier to deal with. Separate services are only needed at scale.
@@ -53,11 +51,10 @@ if (serviceNames.includes("collaboration")) {
 // This function will only be called once in the original process
 async function master() {
   await checkEnv();
-  checkPendingMigrations();
-  await checkMigrations();
+  await checkPendingMigrations();
 
   if (env.TELEMETRY && env.ENVIRONMENT === "production") {
-    checkUpdates();
+    void checkUpdates();
     setInterval(checkUpdates, 24 * 3600 * 1000);
   }
 }
@@ -97,13 +94,17 @@ async function start(id: number, disconnect: () => void) {
     try {
       await sequelize.query("SELECT 1");
     } catch (err) {
-      throw new Error("Database connection failed");
+      Logger.error("Database connection failed", err);
+      ctx.status = 500;
+      return;
     }
 
     try {
       await RedisAdapter.defaultClient.ping();
     } catch (err) {
-      throw new Error("Redis ping failed");
+      Logger.error("Redis ping failed", err);
+      ctx.status = 500;
+      return;
     }
 
     ctx.body = "OK";
@@ -139,29 +140,34 @@ async function start(id: number, disconnect: () => void) {
   server.listen(normalizedPortFlag || env.PORT || "3000");
   server.setTimeout(env.REQUEST_TIMEOUT);
 
-  ShutdownHelper.add("server", ShutdownOrder.last, () => {
-    return new Promise((resolve, reject) => {
-      // Calling stop prevents new connections from being accepted and waits for
-      // existing connections to close for the grace period before forcefully
-      // closing them.
-      server.stop((err, gracefully) => {
-        disconnect();
+  ShutdownHelper.add(
+    "server",
+    ShutdownOrder.last,
+    () =>
+      new Promise((resolve, reject) => {
+        // Calling stop prevents new connections from being accepted and waits for
+        // existing connections to close for the grace period before forcefully
+        // closing them.
+        server.stop((err, gracefully) => {
+          disconnect();
 
-        if (err) {
-          reject(err);
-        } else {
-          resolve(gracefully);
-        }
-      });
-    });
-  });
+          if (err) {
+            reject(err);
+          } else {
+            resolve(gracefully);
+          }
+        });
+      })
+  );
+
+  ShutdownHelper.add("metrics", ShutdownOrder.last, () => Metrics.flush());
 
   // Handle shutdown signals
   process.once("SIGTERM", () => ShutdownHelper.execute());
   process.once("SIGINT", () => ShutdownHelper.execute());
 }
 
-throng({
+void throng({
   master,
   worker: start,
   count: processCount,

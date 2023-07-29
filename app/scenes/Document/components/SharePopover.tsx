@@ -7,6 +7,8 @@ import * as React from "react";
 import { useTranslation, Trans } from "react-i18next";
 import { Link } from "react-router-dom";
 import styled from "styled-components";
+import { s } from "@shared/styles";
+import { dateLocale } from "@shared/utils/date";
 import { SHARE_URL_SLUG_REGEX } from "@shared/utils/urlHelpers";
 import Document from "~/models/Document";
 import Share from "~/models/Share";
@@ -23,7 +25,6 @@ import usePolicy from "~/hooks/usePolicy";
 import useStores from "~/hooks/useStores";
 import useToasts from "~/hooks/useToasts";
 import useUserLocale from "~/hooks/useUserLocale";
-import { dateLocale } from "~/utils/i18n";
 
 type Props = {
   document: Document;
@@ -42,7 +43,7 @@ function SharePopover({
 }: Props) {
   const team = useCurrentTeam();
   const { t } = useTranslation();
-  const { shares } = useStores();
+  const { shares, collections } = useStores();
   const { showToast } = useToasts();
   const [expandedOptions, setExpandedOptions] = React.useState(false);
   const [isEditMode, setIsEditMode] = React.useState(false);
@@ -52,10 +53,14 @@ function SharePopover({
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   const can = usePolicy(share ? share.id : "");
   const documentAbilities = usePolicy(document);
+  const collection = document.collectionId
+    ? collections.get(document.collectionId)
+    : undefined;
   const canPublish =
     can.update &&
     !document.isTemplate &&
     team.sharing &&
+    collection?.sharing &&
     documentAbilities.share;
   const isPubliclyShared =
     team.sharing &&
@@ -71,7 +76,7 @@ function SharePopover({
 
   React.useEffect(() => {
     if (visible && team.sharing) {
-      document.share();
+      void document.share();
       buttonRef.current?.focus();
     }
 
@@ -221,11 +226,7 @@ function SharePopover({
   return (
     <>
       <Heading>
-        {isPubliclyShared ? (
-          <GlobeIcon size={28} color="currentColor" />
-        ) : (
-          <PadlockIcon size={28} color="currentColor" />
-        )}
+        {isPubliclyShared ? <GlobeIcon size={28} /> : <PadlockIcon size={28} />}
         <span>{t("Share this document")}</span>
       </Heading>
 
@@ -326,7 +327,7 @@ function SharePopover({
           <span />
         ) : (
           <MoreOptionsButton
-            icon={<ExpandedIcon color="currentColor" />}
+            icon={<ExpandedIcon />}
             onClick={() => setExpandedOptions(true)}
             neutral
             borderOnHover
@@ -349,7 +350,7 @@ function SharePopover({
 }
 
 const StyledLink = styled(Link)`
-  color: ${(props) => props.theme.textSecondary};
+  color: ${s("textSecondary")};
   text-decoration: underline;
 `;
 
@@ -374,14 +375,14 @@ const NoticeWrapper = styled.div`
 const MoreOptionsButton = styled(Button)`
   background: none;
   font-size: 14px;
-  color: ${(props) => props.theme.textTertiary};
+  color: ${s("textTertiary")};
   margin-left: -8px;
 `;
 
 const Separator = styled.div`
   height: 1px;
   width: 100%;
-  background-color: ${(props) => props.theme.divider};
+  background-color: ${s("divider")};
 `;
 
 const SwitchLabel = styled(Flex)`

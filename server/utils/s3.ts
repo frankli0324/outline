@@ -28,8 +28,8 @@ const AWS_S3_ACCELERATE_URL = removeBucketName(
 );
 const AWS_S3_UPLOAD_BUCKET_URL = removeBucketName(
   process.env.AWS_S3_UPLOAD_BUCKET_URL
-);
-const AWS_S3_UPLOAD_BUCKET_NAME = process.env.AWS_S3_UPLOAD_BUCKET_NAME;
+) || "";
+const AWS_S3_UPLOAD_BUCKET_NAME = process.env.AWS_S3_UPLOAD_BUCKET_NAME || "";
 const AWS_S3_FORCE_PATH_STYLE = process.env.AWS_S3_FORCE_PATH_STYLE;
 
 const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
@@ -179,20 +179,19 @@ export const uploadToS3FromUrl = async (
   }
 };
 
-export const deleteFromS3 = (key: string) => {
-  return s3
+export const deleteFromS3 = (key: string) =>
+  s3
     .deleteObject({
       Bucket: AWS_S3_BUCKET_NAME,
       Key: key,
     })
     .promise();
-};
 
-export const getSignedUrl = async (key: string, expiresInMs = 60) => {
+export const getSignedUrl = async (key: string, expiresIn = 60) => {
   const params = {
     Bucket: AWS_S3_BUCKET_NAME,
     Key: key,
-    Expires: expiresInMs,
+    Expires: expiresIn,
     ResponseContentDisposition: "attachment",
   };
 
@@ -205,19 +204,34 @@ export const getAWSKeyForFileOp = (teamId: string, name: string) => {
   return `${bucket}/${teamId}/${uuidv4()}/${name}-export.zip`;
 };
 
-export const getFileByKey = (key: string) => {
-  const params = {
-    Bucket: AWS_S3_BUCKET_NAME,
-    Key: key,
-  };
-
+export const getFileStream = (key: string) => {
   try {
-    return s3.getObject(params).createReadStream();
+    return s3
+      .getObject({
+        Bucket: AWS_S3_UPLOAD_BUCKET_NAME,
+        Key: key,
+      })
+      .createReadStream();
   } catch (err) {
-    Logger.error("Error getting file from S3 by key", err, {
+    Logger.error("Error getting file stream from S3 ", err, {
       key,
     });
   }
 
   return null;
+};
+
+export const getFileBuffer = async (key: string) => {
+  const response = await s3
+    .getObject({
+      Bucket: AWS_S3_UPLOAD_BUCKET_NAME,
+      Key: key,
+    })
+    .promise();
+
+  if (response.Body) {
+    return response.Body as Blob;
+  }
+
+  throw new Error("Error getting file buffer from S3");
 };

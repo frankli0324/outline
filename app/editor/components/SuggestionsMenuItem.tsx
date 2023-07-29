@@ -25,15 +25,14 @@ function SuggestionsMenuItem({
   const ref = React.useCallback(
     (node) => {
       if (selected && node) {
-        scrollIntoView(node, {
+        void scrollIntoView(node, {
           scrollMode: "if-needed",
           block: "nearest",
-          boundary: (parent) => {
+          boundary: (parent) =>
             // All the parent elements of your target are checked until they
             // reach the portal context. Prevents body and other parent
             // elements from being scrolled
-            return parent !== portal;
-          },
+            parent !== portal,
         });
       }
     },

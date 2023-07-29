@@ -3,11 +3,13 @@ import { observer } from "mobx-react";
 import * as React from "react";
 import styled, { useTheme } from "styled-components";
 import breakpoint from "styled-components-breakpoint";
-import { depths } from "@shared/styles";
+import { depths, s } from "@shared/styles";
+import ErrorBoundary from "~/components/ErrorBoundary";
 import Flex from "~/components/Flex";
 import ResizeBorder from "~/components/Sidebar/components/ResizeBorder";
 import useMobile from "~/hooks/useMobile";
 import useStores from "~/hooks/useStores";
+import { sidebarAppearDuration } from "~/styles/animations";
 
 type Props = React.HTMLAttributes<HTMLDivElement> & {
   children: React.ReactNode;
@@ -65,35 +67,38 @@ function Right({ children, border, className }: Props) {
   }, [isResizing, handleDrag, handleStopDrag]);
 
   const style = React.useMemo(
-    () => ({
-      width: `${ui.sidebarRightWidth}px`,
-    }),
-    [ui.sidebarRightWidth]
+    () =>
+      isMobile
+        ? { width: "80%" }
+        : {
+            width: `${ui.sidebarRightWidth}px`,
+          },
+    [isMobile, ui.sidebarRightWidth]
   );
 
+  const animationProps = {
+    initial: {
+      width: 0,
+    },
+    animate: {
+      transition: isResizing
+        ? { duration: 0 }
+        : {
+            type: "spring",
+            bounce: 0.2,
+            duration: sidebarAppearDuration / 1000,
+          },
+      width: ui.sidebarRightWidth,
+    },
+    exit: {
+      width: 0,
+    },
+  };
+
   return (
-    <Sidebar
-      initial={{
-        width: 0,
-      }}
-      animate={{
-        transition: isResizing
-          ? { duration: 0 }
-          : {
-              type: "spring",
-              bounce: 0.2,
-              duration: 0.6,
-            },
-        width: ui.sidebarRightWidth,
-      }}
-      exit={{
-        width: 0,
-      }}
-      $border={border}
-      className={className}
-    >
+    <Sidebar {...animationProps} $border={border} className={className}>
       <Position style={style} column>
-        {children}
+        <ErrorBoundary>{children}</ErrorBoundary>
         {!isMobile && (
           <ResizeBorder
             onMouseDown={handleMouseDown}
@@ -117,10 +122,9 @@ const Sidebar = styled(m.div)<{
 }>`
   display: flex;
   flex-shrink: 0;
-  background: ${(props) => props.theme.background};
-  width: ${(props) => props.theme.sidebarRightWidth}px;
-  max-width: 70%;
-  border-left: 1px solid ${(props) => props.theme.divider};
+  background: ${s("background")};
+  max-width: 80%;
+  border-left: 1px solid ${s("divider")};
   transition: border-left 100ms ease-in-out;
   z-index: 1;
 

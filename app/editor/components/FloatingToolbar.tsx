@@ -1,25 +1,31 @@
 import { NodeSelection } from "prosemirror-state";
-import { CellSelection } from "prosemirror-tables";
+import { CellSelection, selectedRect } from "prosemirror-tables";
 import * as React from "react";
-import styled from "styled-components";
-import { depths } from "@shared/styles";
+import styled, { css } from "styled-components";
+import { isCode } from "@shared/editor/lib/isCode";
+import { findParentNode } from "@shared/editor/queries/findParentNode";
+import { depths, s } from "@shared/styles";
 import { Portal } from "~/components/Portal";
 import useComponentSize from "~/hooks/useComponentSize";
 import useEventListener from "~/hooks/useEventListener";
 import useMediaQuery from "~/hooks/useMediaQuery";
 import useViewportHeight from "~/hooks/useViewportHeight";
+import Logger from "~/utils/Logger";
 import { useEditor } from "./EditorContext";
 
 type Props = {
   active?: boolean;
   children: React.ReactNode;
+  width?: number;
   forwardedRef?: React.RefObject<HTMLDivElement> | null;
 };
 
 const defaultPosition = {
-  left: -1000,
+  left: -10000,
   top: 0,
   offset: 0,
+  maxWidth: 1000,
+  blockSelection: false,
   visible: false,
 };
 
@@ -48,6 +54,8 @@ function usePosition({
       right: 0,
       top: viewportHeight - menuHeight,
       offset: 0,
+      maxWidth: 1000,
+      blockSelection: false,
       visible: true,
     };
   }
@@ -60,7 +68,7 @@ function usePosition({
     fromPos = view.coordsAtPos(selection.from);
     toPos = view.coordsAtPos(selection.to, -1);
   } catch (err) {
-    console.warn(err);
+    Logger.warn("Unable to calculate selection position", err);
     return defaultPosition;
   }
 
@@ -81,25 +89,54 @@ function usePosition({
         left: 0,
       } as DOMRect);
 
-  // tables are an oddity, and need their own positioning logic
-  const isColSelection =
-    selection instanceof CellSelection &&
-    selection.isColSelection &&
-    selection.isColSelection();
-  const isRowSelection =
-    selection instanceof CellSelection &&
-    selection.isRowSelection &&
-    selection.isRowSelection();
+  // position at the top right of code blocks
+  const codeBlock = findParentNode(isCode)(view.state.selection);
 
-  if (isColSelection) {
-    const { node: element } = view.domAtPos(selection.from);
-    const { width } = (element as HTMLElement).getBoundingClientRect();
-    selectionBounds.top -= 20;
-    selectionBounds.right = selectionBounds.left + width;
+  if (codeBlock) {
+    const element = view.nodeDOM(codeBlock.pos);
+    const bounds = (element as HTMLElement).getBoundingClientRect();
+    selectionBounds.top = bounds.top;
+    selectionBounds.left = bounds.right - menuWidth;
+    selectionBounds.right = bounds.right;
   }
 
-  if (isRowSelection) {
-    selectionBounds.right = selectionBounds.left = selectionBounds.left - 18;
+  // tables are an oddity, and need their own positioning logic
+  const isColSelection =
+    selection instanceof CellSelection && selection.isColSelection();
+  const isRowSelection =
+    selection instanceof CellSelection && selection.isRowSelection();
+
+  if (isColSelection && isRowSelection) {
+    const rect = selectedRect(view.state);
+    const table = view.domAtPos(rect.tableStart);
+    const bounds = (table.node as HTMLElement).getBoundingClientRect();
+    selectionBounds.top = bounds.top - 16;
+    selectionBounds.left = bounds.left - 10;
+    selectionBounds.right = bounds.left - 10;
+  } else if (isColSelection) {
+    const rect = selectedRect(view.state);
+    const table = view.domAtPos(rect.tableStart);
+    const element = (table.node as HTMLElement).querySelector(
+      `tr > *:nth-child(${rect.left + 1})`
+    );
+    if (element instanceof HTMLElement) {
+      const bounds = element.getBoundingClientRect();
+      selectionBounds.top = bounds.top - 16;
+      selectionBounds.left = bounds.left;
+      selectionBounds.right = bounds.right;
+    }
+  } else if (isRowSelection) {
+    const rect = selectedRect(view.state);
+    const table = view.domAtPos(rect.tableStart);
+    const element = (table.node as HTMLElement).querySelector(
+      `tr:nth-child(${rect.top + 1}) > *`
+    );
+    if (element instanceof HTMLElement) {
+      const bounds = element.getBoundingClientRect();
+      selectionBounds.top = bounds.top;
+      selectionBounds.left = bounds.left - 10;
+      selectionBounds.right = bounds.left - 10;
+    }
   }
 
   const isImageSelection =
@@ -123,7 +160,7 @@ function usePosition({
       visible: true,
     };
   } else {
-    // calcluate the horizontal center of the selection
+    // calculate the horizontal center of the selection
     const halfSelection =
       Math.abs(selectionBounds.right - selectionBounds.left) / 2;
     const centerOfSelection = selectionBounds.left + halfSelection;
@@ -134,7 +171,7 @@ function usePosition({
     const margin = 12;
     const left = Math.min(
       Math.min(
-        offsetParent.x + offsetParent.width - menuWidth,
+        offsetParent.x + offsetParent.width - menuWidth - margin,
         window.innerWidth - margin
       ),
       Math.max(
@@ -155,6 +192,8 @@ function usePosition({
       left: Math.round(left - offsetParent.left),
       top: Math.round(top - offsetParent.top),
       offset: Math.round(offset),
+      maxWidth: offsetParent.width,
+      blockSelection: codeBlock || isColSelection || isRowSelection,
       visible: true,
     };
   }
@@ -188,9 +227,12 @@ const FloatingToolbar = React.forwardRef(
       <Portal>
         <Wrapper
           active={props.active && position.visible}
+          arrow={!position.blockSelection}
           ref={menuRef}
-          offset={position.offset}
+          $offset={position.offset}
           style={{
+            width: props.width,
+            maxWidth: `${position.maxWidth}px`,
             top: `${position.top}px`,
             left: `${position.left}px`,
           }}
@@ -202,41 +244,52 @@ const FloatingToolbar = React.forwardRef(
   }
 );
 
-const Wrapper = styled.div<{
+type WrapperProps = {
   active?: boolean;
-  offset: number;
-}>`
+  arrow?: boolean;
+  $offset: number;
+};
+
+const arrow = (props: WrapperProps) =>
+  props.arrow
+    ? css`
+        &::before {
+          content: "";
+          display: block;
+          width: 24px;
+          height: 24px;
+          transform: translateX(-50%) rotate(45deg);
+          background: ${s("menuBackground")};
+          border-radius: 3px;
+          z-index: -1;
+          position: absolute;
+          bottom: -2px;
+          left: calc(50% - ${props.$offset || 0}px);
+          pointer-events: none;
+        }
+      `
+    : "";
+
+const Wrapper = styled.div<WrapperProps>`
   will-change: opacity, transform;
-  padding: 8px 16px;
+  padding: 6px;
   position: absolute;
   z-index: ${depths.editorToolbar};
   opacity: 0;
-  background-color: ${(props) => props.theme.toolbarBackground};
+  background-color: ${s("menuBackground")};
+  box-shadow: ${s("menuShadow")};
   border-radius: 4px;
   transform: scale(0.95);
   transition: opacity 150ms cubic-bezier(0.175, 0.885, 0.32, 1.275),
     transform 150ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
   transition-delay: 150ms;
   line-height: 0;
-  height: 40px;
+  height: 36px;
   box-sizing: border-box;
   pointer-events: none;
   white-space: nowrap;
 
-  &::before {
-    content: "";
-    display: block;
-    width: 24px;
-    height: 24px;
-    transform: translateX(-50%) rotate(45deg);
-    background: ${(props) => props.theme.toolbarBackground};
-    border-radius: 3px;
-    z-index: -1;
-    position: absolute;
-    bottom: -2px;
-    left: calc(50% - ${(props) => props.offset || 0}px);
-    pointer-events: none;
-  }
+  ${arrow}
 
   * {
     box-sizing: border-box;
